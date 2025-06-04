@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="container">
+<div class="container2">
     <h2>Register</h2>
     <form method="POST">
         <input name="username" placeholder="Username" required>
