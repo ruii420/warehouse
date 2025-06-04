@@ -33,54 +33,59 @@ if ($filter) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Warehouse Inventory</title>
+    <title>Warehouse Dashboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="container">
+<div class="wrapper">
     <aside class="sidebar">
-        <h2 class="sidebar-title">Stash</h2>
-        <ul class="sidebar-menu">
-            <li><a href="index.php" class="sidebar-link active">Sākums</a></li>
-            <li><a href="#" class="sidebar-link">Veikt Pasūtijumu</a></li>
-            <li><a href="#" class="sidebar-link">Izveidot atskaiti</a></li>
-            <li><a href="logout.php" class="sidebar-link">Iziet</a></li>
-        </ul>
+        <h1 class="logo">Stash</h1>
+        <nav class="menu">
+            <a href="index.php" class="menu-item active">Sākums</a>
+            <a href="#" class="menu-item">Veikt pasūtijumu</a>
+            <a href="#" class="menu-item">Izveidot atskaiti</a>
+            <a href="logout.php" class="menu-item">Logout</a>
+        </nav>
     </aside>
 
-    <main class="main-content">
-       
-        <h2 class="title">Produkti</h2>
-        <table class="product-table">
-            <thead>
-                <tr>
-                    <th>Produkts</th>
-                    <th>Katagorija</th>
-                    <th>Cena</th>
-                    <th>Firmas Id</th>
-                    <th>Daudzums</th>
-                    <th>Darbības</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (!empty($products)): ?>
-                    <?php foreach ($products as $product): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($product['name']) ?></td>
-                            <td><?= htmlspecialchars($product['category']) ?></td>
-                            <td>&euro;<?= htmlspecialchars($product['price']) ?></td>
-                            <td><?= htmlspecialchars($product['company_id']) ?></td>
-                            <td><?= htmlspecialchars($product['quantity']) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr><td colspan="6" style="text-align:center;">Produkts nav atrasts</td></tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
+    <main class="content">
+        <header class="page-header">
+            <h2>Produkti</h2>
+        </header>
+
+        <section class="table-section">
+            <table class="product-table">
+                <thead>
+                    <tr>
+                        <th>Produkts</th>
+                        <th>Katagorija</th>
+                        <th>Cena</th>
+                        <th>Firma Id</th>
+                        <th>Daudzumus</th>
+                        <th>Darbības</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($products)): ?>
+                        <?php foreach ($products as $product): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($product['name']) ?></td>
+                                <td><?= htmlspecialchars($product['category']) ?></td>
+                                <td>&euro;<?= htmlspecialchars($product['price']) ?></td>
+                                <td><?= htmlspecialchars($product['company_id']) ?></td>
+                                <td><?= htmlspecialchars($product['quantity']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="6" class="no-products">Produkts nav atrasts</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </section>
     </main>
 </div>
 
 </body>
 </html>
+
