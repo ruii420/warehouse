@@ -39,7 +39,7 @@ if (strtotime($start_date) > strtotime('today')) {
     $valid_dates = false;
 }
 
-if (strtotime($end_sdate) > strtotime('today')) {
+if (strtotime($end_date) > strtotime('today')) {
     $msg = "Beigu datums nevar būt pēc šodienas datuma";
     $end_date = date('Y-m-d');
     $valid_dates = false;

@@ -271,17 +271,6 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `username`, `password`, `role_id`, `created_at`) VALUES
-(1, 'admin', '$2y$10$0/OmFAsgExUxMjF.UwQj2uPNUb0bGpZqRtUV7f7LPuZNpQsJfrreS', 1, '2025-06-08 15:11:21'),
-(2, 'worker', '$2y$10$Wtsn2iiYnb1bwANiXwHRtOIiUTwfO9s5j4wQHA3VLL///gq5gdAhq', 2, '2025-06-08 15:12:02'),
-(3, 'shelf', '$2y$10$DIVhwBcr06Sihvhl3q1BC.kEAFOIECtNfWeb0lS94gAaXUSKY0bd2', 4, '2025-06-08 15:12:16'),
-(4, 'realsnabags', '$2y$10$1UCL/mO8liBYmHH55gybVOxzWuiIeQAX9.4PNbv3hFM1vTVO6KZuG', 3, '2025-06-08 15:32:19'),
-(5, 'testing', '$2y$10$M7wDFUK9BI.zKE5W179.feHqv2OGKdV3smhNbquiV3mv6/pjgWgWm', 4, '2025-06-08 15:40:31'),
-(7, 'testadmin', '$2y$10$LvRK1aljbCBoCT5u60KtFe8BVALwi/gFh7yEl9mkKNIeQrqBWVQfq', 3, '2025-06-08 19:03:50');
-
---
--- Indexes for dumped tables
---
 
 --
 -- Indexes for table `inventory_log`

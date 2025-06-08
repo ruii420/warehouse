@@ -20,6 +20,7 @@ $role_display_names = [
 $roles_result = $conn->query("SELECT * FROM roles");
 if ($roles_result) {
     $roles = $roles_result->fetch_all(MYSQLI_ASSOC);
+}
 
 $current_user_stmt = $conn->prepare("SELECT role_id FROM users WHERE id = ?");
 $current_user_stmt->bind_param("i", $_SESSION['user_id']);
