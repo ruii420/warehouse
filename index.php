@@ -42,10 +42,23 @@ if ($filter) {
     <aside class="sidebar">
         <h1 class="logo">Stash</h1>
         <nav class="menu">
-            <a href="index.php" class="menu-item active">Sākums</a>
-            <a href="#" class="menu-item">Veikt pasūtijumu</a>
-            <a href="#" class="menu-item">Izveidot atskaiti</a>
-            <a href="logout.php" class="menu-item">Logout</a>
+            <a href="index.php" class="menu-item active">🏠 Sākums</a>
+            <?php if (isset($_SESSION['permissions']['can_manage_inventory']) && $_SESSION['permissions']['can_manage_inventory']): ?>
+                <a href="manage_inventory.php" class="menu-item">📦 Izvietot preces</a>
+            <?php endif; ?>
+            <?php if (isset($_SESSION['permissions']['can_create_report']) && $_SESSION['permissions']['can_create_report']): ?>
+                <a href="create_report.php" class="menu-item">📄 Sagatavot atskaiti</a>
+            <?php endif; ?>
+            <?php if (isset($_SESSION['permissions']['can_add_product']) && $_SESSION['permissions']['can_add_product']): ?>
+                <a href="add_product.php" class="menu-item">➕ Pievienot produktu</a>
+            <?php endif; ?>
+            <?php if (isset($_SESSION['permissions']['can_add_user']) && $_SESSION['permissions']['can_add_user']): ?>
+                <a href="add_user.php" class="menu-item">👤 Pievienot lietotāju</a>
+            <?php endif; ?>
+            <?php if (isset($_SESSION['permissions']['can_manage_users']) && $_SESSION['permissions']['can_manage_users']): ?>
+                <a href="manage_users.php" class="menu-item">👥 Lietotāji</a>
+            <?php endif; ?>
+            <a href="logout.php" class="menu-item">➡️ Iziet</a>
         </nav>
     </aside>
 

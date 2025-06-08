@@ -1,4 +1,5 @@
 <?php
+session_start();
 require 'db.php';
 
 
@@ -30,13 +31,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($check->num_rows > 0) {
             $msg = "Username already taken.";
         } else {
+            $role_id = 3; 
+            $count_users_stmt = $conn->query("SELECT COUNT(*) FROM users");
+            $user_count = $count_users_stmt->fetch_row()[0];
+            if ($user_count == 0) {
+                $role_id = 1; 
+            }
         
             $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("INSERT INTO users (username, password) VALUES (?, ?)");
-            $stmt->bind_param("ss", $username, $hashed);
+            $stmt = $conn->prepare("INSERT INTO users (username, password, role_id) VALUES (?, ?, ?)");
+            $stmt->bind_param("ssi", $username, $hashed, $role_id);
             if ($stmt->execute()) {
-                $_SESSION['user_id'] = $stmt->insert_id;
-                header("Location: index.php");
+                header("Location: login.php");
                 exit;
             } else {
                 $msg = "Registration failed. Please try again.";
