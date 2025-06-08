@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['permissions']['can_create_
 
 $msg = '';
 $user_role = $_SESSION['role'] ?? '';
+$user_role_lower = strtolower($user_role);
 
 
 $report_types = [];
@@ -19,7 +20,7 @@ $report_types['warehouse_orders'] = [
     'url' => 'report_warehouse_orders.php'
 ];
 
-if ($user_role === 'shelf_organizer' || $user_role === 'admin') {
+if ($user_role_lower === 'shelf organizer' || $user_role_lower === 'admin') {
     $report_types['shelf_activity'] = [
         'title' => 'Plauktu Atskaites',
         'description' => 'Pārskats par preču kustību plauktos',
@@ -27,7 +28,7 @@ if ($user_role === 'shelf_organizer' || $user_role === 'admin') {
     ];
 }
 
-if ($user_role === 'admin') {
+if (strtolower($user_role) === 'admin') {
     $report_types['worker_actions'] = [
         'title' => 'Darbinieku Atskaites',
         'description' => 'Pārskats par darbinieku veiktajām darbībām',
