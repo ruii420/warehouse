@@ -13,34 +13,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $description = trim($_POST['description']);
     $category = trim($_POST['category']);
     $company_id = trim($_POST['company_id']);
-    $quantity = (int)$_POST['quantity'];
-    $price = (float)$_POST['price'];
+    $quantity = filter_var($_POST['quantity'], FILTER_VALIDATE_INT);
+    $price = filter_var($_POST['price'], FILTER_VALIDATE_FLOAT);
     $user_id = $_SESSION['user_id'];
 
     if (empty($name)) {
-        $msg = "Product Name cannot be empty.";
+        $msg = "Produkta nosaukums nevar būt tukšs.";
     } elseif (empty($category)) {
-        $msg = "Category cannot be empty.";
+        $msg = "Kategorija nevar būt tukša.";
     } elseif (empty($company_id)) {
-        $msg = "Company ID cannot be empty.";
-    } elseif (!preg_match("/^[a-zA-Z0-9 ]*$/", $name)) {
-        $msg = "Product Name can only contain letters, numbers, and spaces.";
-    } elseif (!preg_match("/^[a-zA-Z0-9 ]*$/", $category)) {
-        $msg = "Category can only contain letters, numbers, and spaces.";
-    } elseif (!preg_match("/^[a-zA-Z0-9]*$/", $company_id)) {
-        $msg = "Company ID can only contain letters and numbers.";
-    } elseif (!is_numeric($quantity) || $quantity < 0) {
-        $msg = "Quantity must be a non-negative number.";
-    } elseif (!is_numeric($price) || $price < 0) {
-        $msg = "Price must be a non-negative number.";
+        $msg = "Uzņēmuma ID nevar būt tukšs.";
+    } elseif (!preg_match("/^[a-zA-Z0-9_]+$/", $name)) {
+        $msg = "Produkta nosaukums var saturēt tikai burtus, ciparus un pasvītrojumus.";
+    } elseif (!preg_match("/^[a-zA-Z0-9_]+$/", $category)) {
+        $msg = "Kategorija var saturēt tikai burtus, ciparus un pasvītrojumus.";
+    } elseif (!preg_match("/^[a-zA-Z0-9_]+$/", $company_id)) {
+        $msg = "Uzņēmuma ID var saturēt tikai burtus, ciparus un pasvītrojums.";
+    } elseif ($quantity === false || $quantity < 0 || !preg_match("/^[0-9]+$/", $_POST['quantity'])) {
+        $msg = "Daudzumam jābūt pozitīvam veselam skaitlim.";
+    } elseif ($price === false || $price <= 0 || !preg_match("/^[0-9]+\.?[0-9]*$/", $_POST['price'])) {
+        $msg = "Cenai jābūt pozitīvam skaitlim ar minimums 1 punktu.";
     } else {
         $stmt = $conn->prepare("INSERT INTO products (name, description, category, company_id, quantity, price, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->bind_param("ssssidi", $name, $description, $category, $company_id, $quantity, $price, $user_id);
 
         if ($stmt->execute()) {
-            $msg = "Product added successfully!";
+            $product_id = $conn->insert_id;
+
+          
+            if ($quantity > 0) {
+                $action_type = 'Pievienošana';
+                $action_description = "Pievienoja jaunu produktu";
+                $inventory_log_stmt = $conn->prepare("INSERT INTO inventory_log (product_id, user_id, action_type, quantity_change, new_quantity, action_description) VALUES (?, ?, ?, ?, ?, ?)");
+                $inventory_log_stmt->bind_param("iisiss", $product_id, $user_id, $action_type, $quantity, $quantity, $action_description);
+                $inventory_log_stmt->execute();
+            }
+
+            $msg = "Produkts veiksmīgi pievienots!";
+            // Clear form
+            $name = '';
+            $description = '';
+            $category = '';
+            $company_id = '';
+            $quantity = '';
+            $price = '';
         } else {
-            $msg = "Error: " . $stmt->error;
+            $msg = "Kļūda pievienojot produktu: " . $stmt->error;
         }
         $stmt->close();
     }
@@ -50,10 +68,10 @@ $conn->close();
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lv">
 <head>
     <meta charset="UTF-8">
-    <title>Add Product</title>
+    <title>Pievienot Produktu</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -87,31 +105,35 @@ $conn->close();
 
     <main class="content">
         <header class="page-header">
-            <h2>Add New Product</h2>
+            <h2>Pievienot Jaunu Produktu</h2>
         </header>
 
         <section class="form-section">
             <form method="POST" class="add-product-form">
-                <label for="name">Product Name:</label>
-                <input type="text" id="name" name="name">
+                <label for="name">Produkta Nosaukums:</label>
+                <input type="text" id="name" name="name" value="<?= isset($_POST['name']) ? htmlspecialchars($_POST['name']) : '' ?>">
 
-                <label for="description">Description:</label>
-                <textarea id="description" name="description"></textarea>
+                <label for="description">Apraksts:</label>
+                <textarea id="description" name="description"><?= isset($_POST['description']) ? htmlspecialchars($_POST['description']) : '' ?></textarea>
 
-                <label for="category">Category:</label>
-                <input type="text" id="category" name="category">
+                <label for="category">Kategorija:</label>
+                <input type="text" id="category" name="category" value="<?= isset($_POST['category']) ? htmlspecialchars($_POST['category']) : '' ?>">
 
-                <label for="company_id">Company ID:</label>
-                <input type="text" id="company_id" name="company_id">
+                <label for="company_id">Uzņēmuma ID:</label>
+                <input type="text" id="company_id" name="company_id" value="<?= isset($_POST['company_id']) ? htmlspecialchars($_POST['company_id']) : '' ?>">
 
-                <label for="quantity">Quantity:</label>
-                <input type="number" id="quantity" name="quantity">
+                <label for="quantity">Daudzums:</label>
+                <input type="text" id="quantity" name="quantity" value="<?= isset($_POST['quantity']) ? htmlspecialchars($_POST['quantity']) : '' ?>">
 
-                <label for="price">Price:</label>
-                <input type="number" id="price" name="price" step="0.01">
+                <label for="price">Cena:</label>
+                <input type="text" id="price" name="price" value="<?= isset($_POST['price']) ? htmlspecialchars($_POST['price']) : '' ?>">
 
-                <button type="submit">Add Product</button>
-                <?php if ($msg): ?><p class="message"><?= $msg ?></p><?php endif; ?>
+                <button type="submit">Pievienot</button>
+                <?php if ($msg): ?>
+                    <p class="message <?= strpos($msg, 'veiksmīgi') !== false ? 'success' : 'error' ?>">
+                        <?= $msg ?>
+                    </p>
+                <?php endif; ?>
             </form>
         </section>
     </main>

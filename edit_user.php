@@ -8,104 +8,157 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['permissions']['can_manage_
 }
 
 $msg = '';
-$user_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$user_data = null;
+$user = null;
 $roles = [];
 
-$roles_result = $conn->query("SELECT id, role_name FROM roles");
+// Define role display names
+$role_display_names = [
+    'Admin' => 'Administrators',
+    'Warehouse Worker' => 'Noliktavas Darbinieks',
+    'Shelf Organizer' => 'Plauktu Krāvējs',
+    'Regular User' => 'Parasts Lietotājs'
+];
+
+// Get roles
+$roles_result = $conn->query("SELECT * FROM roles");
 if ($roles_result) {
     $roles = $roles_result->fetch_all(MYSQLI_ASSOC);
 }
 
-if ($user_id > 0) {
-    $stmt = $conn->prepare("SELECT id, username, role_id FROM users WHERE id = ?");
-    $stmt->bind_param("i", $user_id);
+// Get current user's role
+$current_user_stmt = $conn->prepare("SELECT role_id FROM users WHERE id = ?");
+$current_user_stmt->bind_param("i", $_SESSION['user_id']);
+$current_user_stmt->execute();
+$current_user_result = $current_user_stmt->get_result();
+$current_user = $current_user_result->fetch_assoc();
+$current_user_stmt->close();
+
+if (isset($_GET['id'])) {
+    $user_id = filter_var($_GET['id'], FILTER_VALIDATE_INT);
+    if (!$user_id) {
+        $msg = "Nederīgs lietotāja ID.";
+    } else {
+        $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$user) {
+            $msg = "Lietotājs nav atrasts.";
+        }
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user) {
+    $username = trim($_POST['username']);
+    $password = $_POST['password']; // Only if changing password
+    $role_id = filter_var($_POST['role_id'], FILTER_VALIDATE_INT);
+    $valid = true;
+    $errors = [];
+
+    // Validate username
+    if (empty($username)) {
+        $valid = false;
+        $errors[] = "Lietotājvārds ir obligāts.";
+    } elseif (strlen($username) < 3) {
+        $valid = false;
+        $errors[] = "Lietotājvārdam jābūt vismaz 3 rakstzīmes garam.";
+    } elseif (!preg_match('/^[a-zA-Z0-9]+$/', $username)) {
+        $valid = false;
+        $errors[] = "Lietotājvārds var saturēt tikai burtus un ciparus.";
+    }
+
+    // Check if username exists (excluding current user)
+    $stmt = $conn->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
+    $stmt->bind_param("si", $username, $user['id']);
     $stmt->execute();
-    $result = $stmt->get_result();
-    $user_data = $result->fetch_assoc();
+    if ($stmt->get_result()->num_rows > 0) {
+        $valid = false;
+        $errors[] = "Lietotājvārds jau eksistē.";
+    }
     $stmt->close();
 
-    if (!$user_data) {
-        $msg = "User not found.";
+    // Validate role
+    if (!$role_id) {
+        $valid = false;
+        $errors[] = "Lūdzu izvēlieties derīgu lomu.";
     }
-} else {
-    $msg = "Invalid user ID.";
-}
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_data) {
-    $new_username = trim($_POST['username']);
-    $new_password = $_POST['password'];
-    $new_role_id = (int)$_POST['role_id'];
 
-    if ($user_id == $_SESSION['user_id']) {
+    // Check if trying to modify own role
+    if ($user['id'] == $_SESSION['user_id'] && $role_id != $user['role_id']) {
+        // Get count of admins
+        $admin_role_id = 1; // Assuming 1 is admin role ID
+        $admin_count_stmt = $conn->prepare("SELECT COUNT(*) as count FROM users WHERE role_id = ?");
+        $admin_count_stmt->bind_param("i", $admin_role_id);
+        $admin_count_stmt->execute();
+        $admin_count_result = $admin_count_stmt->get_result();
+        $admin_count = $admin_count_result->fetch_assoc()['count'];
+        $admin_count_stmt->close();
 
-        $current_role_stmt = $conn->prepare("SELECT role_id FROM users WHERE id = ?");
-        $current_role_stmt->bind_param("i", $user_id);
-        $current_role_stmt->execute();
-        $current_role_result = $current_role_stmt->get_result();
-        $current_role = $current_role_result->fetch_assoc();
-        $current_role_stmt->close();
-
-        $admin_role_id = 1; 
-        if ($current_role['role_id'] == $admin_role_id && $new_role_id != $admin_role_id) {
-            $admin_count_stmt = $conn->query("SELECT COUNT(*) FROM users WHERE role_id = " . $admin_role_id);
-            $admin_count = $admin_count_stmt->fetch_row()[0];
-            if ($admin_count <= 1) {
-                $msg = "Cannot change your own role from Admin if you are the only administrator.";
-            }
+        // If current user is admin and trying to change their role
+        if ($user['role_id'] == $admin_role_id && $admin_count <= 1) {
+            $valid = false;
+            $errors[] = "Nevar mainīt savu lomu, jo jūs esat vienīgais administrators.";
         }
     }
 
-    if (empty($new_username)) {
-        $msg = "Username cannot be empty.";
-    } elseif (strlen($new_username) < 3) {
-        $msg = "Username must be at least 3 characters long.";
-    } elseif (!preg_match('/^[a-zA-Z0-9]+$/', $new_username)) {
-        $msg = "Username can only contain letters and numbers.";
+    // Validate password if provided
+    if (!empty($password)) {
+        if (strlen($password) < 6) {
+            $valid = false;
+            $errors[] = "Parolei jābūt vismaz 6 rakstzīmes garai.";
+        } elseif (!preg_match('/[A-Z]/', $password)) {
+            $valid = false;
+            $errors[] = "Parolei jāsatur vismaz viens lielais burts.";
+        } elseif (!preg_match('/^[a-zA-Z0-9]+$/', $password)) {
+            $valid = false;
+            $errors[] = "Parole var saturēt tikai burtus un ciparus.";
+        }
+    }
+
+    // Validate role change permissions
+    if ($role_id != $user['role_id']) {
+        // Only admin can change roles
+        if ($current_user['role_id'] != 1) { // Assuming 1 is admin role ID
+            $valid = false;
+            $errors[] = "Tikai administrators var mainīt lietotāju lomas.";
+        }
+    }
+
+    if ($valid) {
+        try {
+            $conn->begin_transaction();
+
+            if (!empty($password)) {
+                // Update with new password
+                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $conn->prepare("UPDATE users SET username = ?, password = ?, role_id = ? WHERE id = ?");
+                $stmt->bind_param("ssii", $username, $hashed_password, $role_id, $user['id']);
+            } else {
+                // Update without changing password
+                $stmt = $conn->prepare("UPDATE users SET username = ?, role_id = ? WHERE id = ?");
+                $stmt->bind_param("sii", $username, $role_id, $user['id']);
+            }
+
+            if ($stmt->execute()) {
+                $conn->commit();
+                $msg = "Lietotājs veiksmīgi atjaunināts!";
+                // Refresh user data
+                $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+                $stmt->bind_param("i", $user['id']);
+                $stmt->execute();
+                $user = $stmt->get_result()->fetch_assoc();
+            } else {
+                throw new Exception($stmt->error);
+            }
+            $stmt->close();
+        } catch (Exception $e) {
+            $conn->rollback();
+            $msg = "Kļūda atjauninot lietotāju: " . $e->getMessage();
+        }
     } else {
-
-        $check = $conn->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
-        $check->bind_param("si", $new_username, $user_id);
-        $check->execute();
-        $check->store_result();
-
-        if ($check->num_rows > 0) {
-            $msg = "Username already taken by another user.";
-        } else {
-            $update_sql = "UPDATE users SET username = ?, role_id = ?";
-            $params = [$new_username, $new_role_id];
-            $types = "si";
-
-            if (!empty($new_password)) {
-                if (strlen($new_password) < 6) {
-                    $msg = "Password must be at least 6 characters long.";
-                } elseif (!preg_match('/[A-Z]/', $new_password)) {
-                    $msg = "Password must contain at least one uppercase letter.";
-                } else {
-                    $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-                    $update_sql .= ", password = ?";
-                    $params[] = $hashed_password;
-                    $types .= "s";
-                }
-            }
-
-            if (empty($msg)) { 
-                $update_sql .= " WHERE id = ?";
-                $params[] = $user_id;
-                $types .= "i";
-
-                $stmt = $conn->prepare($update_sql);
-                $stmt->bind_param($types, ...$params);
-
-                if ($stmt->execute()) {
-                    $msg = "User updated successfully!";
-                    $user_data['username'] = $new_username;
-                    $user_data['role_id'] = $new_role_id;
-                } else {
-                    $msg = "Error updating user: " . $stmt->error;
-                }
-                $stmt->close();
-            }
-        }
+        $msg = implode("<br>", $errors);
     }
 }
 
@@ -113,10 +166,10 @@ $conn->close();
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lv">
 <head>
     <meta charset="UTF-8">
-    <title>Edit User</title>
+    <title>Rediģēt Lietotāju</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -129,6 +182,9 @@ $conn->close();
             <?php if (isset($_SESSION['permissions']['can_manage_inventory']) && $_SESSION['permissions']['can_manage_inventory']): ?>
                 <a href="manage_inventory.php" class="menu-item">📦 Izvietot preces</a>
             <?php endif; ?>
+            <?php if (isset($_SESSION['permissions']['can_make_order']) && $_SESSION['permissions']['can_make_order']): ?>
+                <a href="make_order.php" class="menu-item">🚚 Veikt pasūtījumu</a>
+            <?php endif; ?>
             <?php if (isset($_SESSION['permissions']['can_create_report']) && $_SESSION['permissions']['can_create_report']): ?>
                 <a href="create_report.php" class="menu-item">📄 Sagatavot atskaiti</a>
             <?php endif; ?>
@@ -139,7 +195,7 @@ $conn->close();
                 <a href="add_user.php" class="menu-item">👤 Pievienot lietotāju</a>
             <?php endif; ?>
             <?php if (isset($_SESSION['permissions']['can_manage_users']) && $_SESSION['permissions']['can_manage_users']): ?>
-                <a href="manage_users.php" class="menu-item active">👥 Lietotāji</a>
+                <a href="manage_users.php" class="menu-item">👥 Lietotāji</a>
             <?php endif; ?>
             <a href="logout.php" class="menu-item">➡️ Iziet</a>
         </nav>
@@ -147,33 +203,47 @@ $conn->close();
 
     <main class="content">
         <header class="page-header">
-            <h2>Edit User</h2>
+            <h2>Rediģēt Lietotāju</h2>
         </header>
 
         <section class="form-section">
-            <?php if ($msg): ?><p class="message"><?= $msg ?></p><?php endif; ?>
+            <?php if ($msg): ?>
+                <p class="message <?= strpos($msg, 'veiksmīgi') !== false ? 'success' : 'error' ?>">
+                    <?= $msg ?>
+                </p>
+            <?php endif; ?>
 
-            <?php if ($user_data): ?>
-                <form method="POST" class="edit-user-form">
-                    <label for="username">Username:</label>
-                    <input type="text" id="username" name="username" value="<?= htmlspecialchars($user_data['username']) ?>" required>
-
-                    <label for="password">New Password (leave blank to keep current):</label>
-                    <input type="password" id="password" name="password">
-
-                    <label for="role_id">Role:</label>
-                    <select id="role_id" name="role_id" required>
-                        <?php foreach ($roles as $role): ?>
-                            <option value="<?= $role['id'] ?>" <?= ($role['id'] == $user_data['role_id']) ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($role['role_name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select><br>
-
-                    <button type="submit">Update User</button>
+            <?php if ($user): ?>
+                <form method="POST" class="user-form">
+                    <div class="form-group">
+                        <label for="username">Lietotājvārds:</label>
+                        <input type="text" id="username" name="username" 
+                               value="<?= htmlspecialchars($user['username']) ?>">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Parole: (atstājiet tukšu, lai nemainītu)</label>
+                        <input type="password" id="password" name="password">
+                    </div>
+                    <div class="form-group">
+                        <label for="role_id">Loma:</label>
+                        <select id="role_id" name="role_id">
+                            <?php foreach ($roles as $role): ?>
+                                <?php
+                                // Get display name if available, otherwise use database name
+                                $display_name = $role_display_names[$role['role_name']] ?? $role['role_name'];
+                                ?>
+                                <option value="<?= htmlspecialchars($role['id']) ?>" 
+                                    <?= $role['id'] == $user['role_id'] ? 'selected' : '' ?>
+                                    <?= ($current_user['role_id'] != 1 && $role['id'] != $user['role_id']) ? 'disabled' : '' ?>>
+                                    <?= htmlspecialchars($display_name) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <button type="submit" class="button">Saglabāt Izmaiņas</button>
                 </form>
             <?php else: ?>
-                <p>User details could not be loaded.</p>
+                <p class="error">Lietotājs nav atrasts.</p>
             <?php endif; ?>
         </section>
     </main>

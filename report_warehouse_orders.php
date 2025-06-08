@@ -9,115 +9,180 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['permissions']['can_create_
 
 $msg = '';
 $report_data = [];
+$valid_dates = true;
 
-$warehouse_worker_role_id = null;
-$role_stmt = $conn->prepare("SELECT id FROM roles WHERE role_name = ?");
-$role_name = 'Warehouse Worker';
-$role_stmt->bind_param("s", $role_name);
-$role_stmt->execute();
-$role_result = $role_stmt->get_result();
-if ($row = $role_result->fetch_assoc()) {
-    $warehouse_worker_role_id = $row['id'];
+$start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-d', strtotime('-30 days'));
+$end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d');
+
+if (!preg_match("/^\d{4}-\d{2}-\d{2}$/", $start_date) || !strtotime($start_date)) {
+    $msg = "Nederīgs sākuma datuma formāts. Lūdzu izmantojiet GGGG-MM-DD formātu.";
+    $start_date = date('Y-m-d', strtotime('-30 days'));
+    $valid_dates = false;
 }
-$role_stmt->close();
 
-if ($warehouse_worker_role_id !== null) {
-    $stmt = $conn->prepare("
-        SELECT o.id, p.name AS product_name, u.username AS worker_name, o.order_quantity, o.old_quantity, o.new_quantity, o.order_time
+if (!preg_match("/^\d{4}-\d{2}-\d{2}$/", $end_date) || !strtotime($end_date)) {
+    $msg = "Nederīgs beigu datuma formāts. Lūdzu izmantojiet GGGG-MM-DD formātu.";
+    $end_date = date('Y-m-d');
+    $valid_dates = false;
+}
+
+if (strtotime($end_date) < strtotime($start_date)) {
+    $msg = "Beigu datums nevar būt agrāks par sākuma datumu";
+    $end_date = date('Y-m-d');
+    $start_date = date('Y-m-d', strtotime('-30 days'));
+    $valid_dates = false;
+}
+
+if (strtotime($start_date) > strtotime('today')) {
+    $msg = "Sākuma datums nevar būt nākotnē";
+    $start_date = date('Y-m-d');
+    $valid_dates = false;
+}
+
+if (strtotime($end_sdate) > strtotime('today')) {
+    $msg = "Beigu datums nevar būt pēc šodienas datuma";
+    $end_date = date('Y-m-d');
+    $valid_dates = false;
+}
+
+if ($valid_dates) {
+    $query = "
+        SELECT 
+            o.id,
+            o.order_time as order_date,
+            o.order_quantity,
+            o.old_quantity,
+            o.new_quantity,
+            p.name as product_name,
+            p.price,
+            u.username as ordered_by
         FROM orders o
         JOIN products p ON o.product_id = p.id
         JOIN users u ON o.user_id = u.id
-        WHERE u.role_id = ? -- Filter by Warehouse Worker role
+        WHERE DATE(o.order_time) BETWEEN ? AND ?
         ORDER BY o.order_time DESC
-    ");
-    $stmt->bind_param("i", $warehouse_worker_role_id);
+    ";
+
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("ss", $start_date, $end_date);
     $stmt->execute();
     $result = $stmt->get_result();
     $report_data = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
-} else {
-    $msg = "Warehouse Worker role not found.";
+}
+
+$total_orders = count($report_data);
+$total_quantity = 0;
+$total_amount = 0;
+
+foreach ($report_data as &$order) {
+    $total_quantity += $order['order_quantity'];
+    $order['total_amount'] = $order['order_quantity'] * $order['price'];
+    $total_amount += $order['total_amount'];
 }
 
 $conn->close();
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lv">
 <head>
     <meta charset="UTF-8">
-    <title>Pasūtījumu Pārskats</title>
+    <title>Noliktavas Pasūtījumu Atskaite</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="wrapper">
+        <aside class="sidebar">
+            <h1 class="logo">Stash</h1>
+            <nav class="menu">
+                <a href="index.php" class="menu-item">🏠 Sākums</a>
+                <a href="create_report.php" class="menu-item">📄 Atskaites</a>
+                <a href="logout.php" class="menu-item">➡️ Iziet</a>
+            </nav>
+        </aside>
 
-<div class="wrapper">
-    <aside class="sidebar">
-        <h1 class="logo">Stash</h1>
-        <nav class="menu">
-            <a href="index.php" class="menu-item">🏠 Sākums</a>
-            <?php if (isset($_SESSION['permissions']['can_manage_inventory']) && $_SESSION['permissions']['can_manage_inventory']): ?>
-                <a href="manage_inventory.php" class="menu-item">📦 Izvietot preces</a>
-            <?php endif; ?>
-            <?php if (isset($_SESSION['permissions']['can_make_order']) && $_SESSION['permissions']['can_make_order']): ?>
-                <a href="make_order.php" class="menu-item">🚚 Veikt pasūtījumu</a>
-            <?php endif; ?>
-            <?php if (isset($_SESSION['permissions']['can_create_report']) && $_SESSION['permissions']['can_create_report']): ?>
-                <a href="create_report.php" class="menu-item active">📄 Sagatavot atskaiti</a>
-            <?php endif; ?>
-            <?php if (isset($_SESSION['permissions']['can_add_product']) && $_SESSION['permissions']['can_add_product']): ?>
-                <a href="add_product.php" class="menu-item">➕ Pievienot produktu</a>
-            <?php endif; ?>
-            <?php if (isset($_SESSION['permissions']['can_add_user']) && $_SESSION['permissions']['can_add_user']): ?>
-                <a href="add_user.php" class="menu-item">👤 Pievienot lietotāju</a>
-            <?php endif; ?>
-            <?php if (isset($_SESSION['permissions']['can_manage_users']) && $_SESSION['permissions']['can_manage_users']): ?>
-                <a href="manage_users.php" class="menu-item">👥 Lietotāji</a>
-            <?php endif; ?>
-            <a href="logout.php" class="menu-item">➡️ Iziet</a>
-        </nav>
-    </aside>
+        <main class="content">
+            <header class="page-header">
+                <h2>Noliktavas Pasūtījumu Atskaite</h2>
+            </header>
 
-    <main class="content">
-        <header class="page-header">
-            <h2>Pasūtījumu Pārskats</h2>
-        </header>
+            <section class="filters">
+                <?php if ($msg): ?>
+                    <p class="message error"><?= $msg ?></p>
+                <?php endif; ?>
+                <form method="GET" class="form-inline">
+                    <div class="form-group">
+                        <label for="start_date">No:</label>
+                        <input type="date" id="start_date" name="start_date" 
+                               value="<?= htmlspecialchars($start_date) ?>"
+                               max="<?= date('Y-m-d') ?>"
+                               required>
+                    </div>
+                    <div class="form-group">
+                        <label for="end_date">Līdz:</label>
+                        <input type="date" id="end_date" name="end_date" 
+                               value="<?= htmlspecialchars($end_date) ?>"
+                               max="<?= date('Y-m-d') ?>"
+                               required>
+                    </div>
+                    <button type="submit" class="button">Filtrēt</button>
+                </form>
+            </section>
 
-        <section class="table-section">
-            <?php if ($msg): ?><p class="message"><?= $msg ?></p><?php endif; ?>
-            <table class="product-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Produkts</th>
-                        <th>Darbinieks</th>
-                        <th>Pasūtījuma Daudzums</th>
-                        <th>Vecais Daudzums</th>
-                        <th>Jauns Daudzums</th>
-                        <th>Datums</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($report_data)): ?>
-                        <?php foreach ($report_data as $row): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($row['id']) ?></td>
-                                <td><?= htmlspecialchars($row['product_name']) ?></td>
-                                <td><?= htmlspecialchars($row['worker_name']) ?></td>
-                                <td><?= htmlspecialchars($row['order_quantity']) ?></td>
-                                <td><?= htmlspecialchars($row['old_quantity']) ?></td>
-                                <td><?= htmlspecialchars($row['new_quantity']) ?></td>
-                                <td><?= htmlspecialchars($row['order_time']) ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr><td colspan="7" class="no-products">Nav atrasts neviens pasūtījums no noliktavas darbinieka.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </section>
-    </main>
-</div>
+            <section class="statistics-section">
+                <div class="stat-cards">
+                    <div class="stat-card">
+                        <h3>Kopējie Pasūtījumi</h3>
+                        <p class="stat-number"><?= $total_orders ?></p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Kopējais Daudzums</h3>
+                        <p class="stat-number"><?= $total_quantity ?></p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Kopējā Summa</h3>
+                        <p class="stat-number"><?= number_format($total_amount, 2) ?> €</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="table-section">
+                <table class="product-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Datums</th>
+                            <th>Pasūtītājs</th>
+                            <th>Produkts</th>
+                            <th>Daudzums</th>
+                            <th>Vecais Daudzums</th>
+                            <th>Jaunais Daudzums</th>
+                            <th>Summa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!empty($report_data)): ?>
+                            <?php foreach ($report_data as $row): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($row['id']) ?></td>
+                                    <td><?= htmlspecialchars($row['order_date']) ?></td>
+                                    <td><?= htmlspecialchars($row['ordered_by']) ?></td>
+                                    <td><?= htmlspecialchars($row['product_name']) ?></td>
+                                    <td><?= htmlspecialchars($row['order_quantity']) ?></td>
+                                    <td><?= htmlspecialchars($row['old_quantity']) ?></td>
+                                    <td><?= htmlspecialchars($row['new_quantity']) ?></td>
+                                    <td><?= number_format($row['total_amount'], 2) ?> €</td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr><td colspan="8" class="no-data">Nav atrasts neviens pasūtījums.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </section>
+        </main>
+    </div>
 
 </body>
 </html> 

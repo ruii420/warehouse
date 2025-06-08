@@ -11,41 +11,48 @@ $msg = '';
 if (isset($_GET['id'])) {
     $product_id = (int)$_GET['id'];
 
-    $product_name_stmt = $conn->prepare("SELECT name FROM products WHERE id = ?");
+    
+    $product_name_stmt = $conn->prepare("SELECT name, quantity FROM products WHERE id = ?");
     $product_name_stmt->bind_param("i", $product_id);
     $product_name_stmt->execute();
-    $product_name_result = $product_name_stmt->get_result();
-    $product_name = $product_name_result->fetch_assoc()['name'] ?? 'Unknown Product';
+    $product_result = $product_name_stmt->get_result();
+    $product = $product_result->fetch_assoc();
+    $product_name = $product['name'] ?? 'Nezināms Produkts';
+    $current_quantity = $product['quantity'] ?? 0;
     $product_name_stmt->close();
 
     $stmt = $conn->prepare("DELETE FROM products WHERE id = ?");
     $stmt->bind_param("i", $product_id);
 
     if ($stmt->execute()) {
-        $msg = "Product deleted successfully!";
+        $msg = "Produkts veiksmīgi dzēsts!";
 
         $user_id = $_SESSION['user_id'];
-        $action_type = 'Delete';
-        $action_description = "Deleted product: " . $product_name . " (ID: " . $product_id . ")";
+        $action_type = 'Dzēšana';
+        $action_description = "Dzēsts produkts: " . $product_name . " (ID: " . $product_id . ")";
 
+        
         $log_mod_stmt = $conn->prepare("INSERT INTO product_log (product_id, user_id, action_type, action_description) VALUES (?, ?, ?, ?)");
         $log_mod_stmt->bind_param("iiss", $product_id, $user_id, $action_type, $action_description);
         $log_mod_stmt->execute();
         $log_mod_stmt->close();
 
-        $general_log_stmt = $conn->prepare("INSERT INTO inventory_log (product_id, user_id, action_type, action_description, is_edit_or_delete) VALUES (?, ?, ?, ?, ?)");
-        $general_log_stmt->bind_param("iisss", $product_id, $user_id, $action_type, $action_description, TRUE);
-        $general_log_stmt->execute();
-        $general_log_stmt->close();
+      
+        $quantity_change = -$current_quantity;
+        $new_quantity = 0;
+        $inventory_log_stmt = $conn->prepare("INSERT INTO inventory_log (product_id, user_id, action_type, quantity_change, new_quantity, action_description) VALUES (?, ?, ?, ?, ?, ?)");
+        $inventory_log_stmt->bind_param("iisiss", $product_id, $user_id, $action_type, $quantity_change, $new_quantity, $action_description);
+        $inventory_log_stmt->execute();
+        $inventory_log_stmt->close();
 
         header("Location: index.php?msg=" . urlencode($msg));
         exit;
     } else {
-        $msg = "Error deleting product: " . $stmt->error;
+        $msg = "Kļūda dzēšot produktu: " . $stmt->error;
     }
     $stmt->close();
 } else {
-    $msg = "Invalid product ID.";
+    $msg = "Nederīgs produkta ID.";
 }
 
 $conn->close();

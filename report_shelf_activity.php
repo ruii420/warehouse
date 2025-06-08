@@ -14,6 +14,7 @@ $valid_dates = true;
 $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-d', strtotime('-30 days'));
 $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d');
 
+
 if (!preg_match("/^\d{4}-\d{2}-\d{2}$/", $start_date) || !strtotime($start_date)) {
     $msg = "Nederīgs sākuma datuma formāts. Lūdzu izmantojiet GGGG-MM-DD formātu.";
     $start_date = date('Y-m-d', strtotime('-30 days'));
@@ -45,31 +46,36 @@ if (strtotime($end_date) > strtotime('today')) {
     $valid_dates = false;
 }
 
-$worker_filter = isset($_GET['worker_id']) ? $_GET['worker_id'] : null;
+$shelf_filter = isset($_GET['shelf_id']) ? (int)$_GET['shelf_id'] : null;
 
-$workers_result = $conn->query("SELECT id, username FROM users ORDER BY username");
-$workers = $workers_result->fetch_all(MYSQLI_ASSOC);
+$shelves_result = $conn->query("SELECT id, shelf_code, section FROM shelves ORDER BY section, shelf_code");
+$shelves = $shelves_result->fetch_all(MYSQLI_ASSOC);
+
 
 if ($valid_dates) {
     $query = "
         SELECT 
-            il.id,
-            p.name AS product_name,
-            u.username AS worker_name,
-            il.action_type,
-            il.quantity_change as quantity,
-            il.action_description as notes,
-            il.log_time as created_at
-        FROM inventory_log il
-        JOIN products p ON il.product_id = p.id
-        JOIN users u ON il.user_id = u.id
-        WHERE DATE(il.log_time) BETWEEN ? AND ?
+            sal.id,
+            sal.action_time,
+            p.name as product_name,
+            s1.shelf_code as from_shelf,
+            s2.shelf_code as to_shelf,
+            sal.quantity,
+            sal.action_type,
+            u.username as user_name,
+            sal.notes
+        FROM shelf_activity_log sal
+        JOIN products p ON sal.product_id = p.id
+        LEFT JOIN shelves s1 ON sal.from_shelf_id = s1.id
+        LEFT JOIN shelves s2 ON sal.to_shelf_id = s2.id
+        JOIN users u ON sal.user_id = u.id
+        WHERE DATE(sal.action_time) BETWEEN ? AND ?
     ";
 
-    if ($worker_filter) {
-        $query .= " AND il.user_id = ?";
+    if ($shelf_filter) {
+        $query .= " AND (sal.from_shelf_id = ? OR sal.to_shelf_id = ?)";
         $stmt = $conn->prepare($query);
-        $stmt->bind_param("ssi", $start_date, $end_date, $worker_filter);
+        $stmt->bind_param("ssii", $start_date, $end_date, $shelf_filter, $shelf_filter);
     } else {
         $stmt = $conn->prepare($query);
         $stmt->bind_param("ss", $start_date, $end_date);
@@ -81,21 +87,26 @@ if ($valid_dates) {
     $stmt->close();
 }
 
-$total_actions = count($report_data);
-$total_quantity = 0;
-$actions_by_worker = [];
-$actions_by_type = [];
 
-foreach ($report_data as $action) {
-    $total_quantity += abs($action['quantity']);
-    $worker = $action['worker_name'];
-    $type = $action['action_type'];
+$total_movements = count($report_data);
+$total_quantity = 0;
+$movements_by_shelf = [];
+$movements_by_type = [];
+
+foreach ($report_data as $movement) {
+    $total_quantity += $movement['quantity'];
     
-    $actions_by_worker[$worker] = ($actions_by_worker[$worker] ?? 0) + 1;
-    $actions_by_type[$type] = ($actions_by_type[$type] ?? 0) + 1;
+    if ($movement['from_shelf']) {
+        $movements_by_shelf[$movement['from_shelf']] = ($movements_by_shelf[$movement['from_shelf']] ?? 0) + 1;
+    }
+    if ($movement['to_shelf']) {
+        $movements_by_shelf[$movement['to_shelf']] = ($movements_by_shelf[$movement['to_shelf']] ?? 0) + 1;
+    }
+    
+    $movements_by_type[$movement['action_type']] = ($movements_by_type[$movement['action_type']] ?? 0) + 1;
 }
 
-$most_active_worker = !empty($actions_by_worker) ? array_search(max($actions_by_worker), $actions_by_worker) : '-';
+$most_active_shelf = !empty($movements_by_shelf) ? array_search(max($movements_by_shelf), $movements_by_shelf) : '-';
 
 $conn->close();
 ?>
@@ -104,7 +115,7 @@ $conn->close();
 <html lang="lv">
 <head>
     <meta charset="UTF-8">
-    <title>Darbinieku Darbību Atskaite</title>
+    <title>Plauktu Aktivitātes Atskaite</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -120,7 +131,7 @@ $conn->close();
 
         <main class="content">
             <header class="page-header">
-                <h2>Darbinieku Darbību Atskaite</h2>
+                <h2>Plauktu Aktivitātes Atskaite</h2>
             </header>
 
             <section class="filters">
@@ -143,13 +154,13 @@ $conn->close();
                                required>
                     </div>
                     <div class="form-group">
-                        <label for="worker_id">Darbinieks:</label>
-                        <select name="worker_id" id="worker_id">
-                            <option value="">Visi darbinieki</option>
-                            <?php foreach ($workers as $worker): ?>
-                                <option value="<?= $worker['id'] ?>" 
-                                    <?= $worker_filter === $worker['id'] ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($worker['username']) ?>
+                        <label for="shelf_id">Plaukts:</label>
+                        <select name="shelf_id" id="shelf_id">
+                            <option value="">Visi plaukti</option>
+                            <?php foreach ($shelves as $shelf): ?>
+                                <option value="<?= $shelf['id'] ?>" 
+                                    <?= $shelf_filter === $shelf['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($shelf['shelf_code']) ?> - Sekcija <?= substr($shelf['section'], -1) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -161,15 +172,15 @@ $conn->close();
             <section class="statistics-section">
                 <div class="stat-cards">
                     <div class="stat-card">
-                        <h3>Kopējās Darbības</h3>
-                        <p class="stat-number"><?= $total_actions ?></p>
+                        <h3>Kopējās Kustības</h3>
+                        <p class="stat-number"><?= $total_movements ?></p>
                     </div>
                     <div class="stat-card">
-                        <h3>Aktīvākais Darbinieks</h3>
-                        <p class="stat-number"><?= htmlspecialchars($most_active_worker) ?></p>
+                        <h3>Aktīvākais Plaukts</h3>
+                        <p class="stat-number"><?= htmlspecialchars($most_active_shelf) ?></p>
                     </div>
                     <div class="stat-card">
-                        <h3>Kopējais Daudzums</h3>
+                        <h3>Kopējais Pārvietotais Daudzums</h3>
                         <p class="stat-number"><?= $total_quantity ?></p>
                     </div>
                 </div>
@@ -179,47 +190,45 @@ $conn->close();
                 <table class="product-table">
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Datums</th>
                             <th>Produkts</th>
-                            <th>Darbinieks</th>
-                            <th>Darbība</th>
+                            <th>No Plaukta</th>
+                            <th>Uz Plauktu</th>
                             <th>Daudzums</th>
+                            <th>Darbība</th>
+                            <th>Darbinieks</th>
                             <th>Piezīmes</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (!empty($report_data)): ?>
                             <?php foreach ($report_data as $row): ?>
-                                <?php
+                                <?php 
+                                
                                 $action_type_lv = [
-                                    'Order' => 'Pasūtījums',
-                                    'Pievienošana' => 'Pievienošana',
-                                    'Rediģēšana' => 'Rediģēšana',
-                                    'Daudzuma_maiņa' => 'Daudzuma maiņa',
-                                    'Novietošana' => 'Novietošana',
-                                    'Pārvietošana' => 'Pārvietošana',
-                                    'Delete' => 'Dzēšana'
+                                    'place' => 'Novietošana',
+                                    'remove' => 'Izņemšana',
+                                    'transfer' => 'Pārvietošana'
                                 ][$row['action_type']] ?? $row['action_type'];
                                 ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($row['id']) ?></td>
-                                    <td><?= htmlspecialchars($row['created_at']) ?></td>
+                                    <td><?= htmlspecialchars($row['action_time']) ?></td>
                                     <td><?= htmlspecialchars($row['product_name']) ?></td>
-                                    <td><?= htmlspecialchars($row['worker_name']) ?></td>
-                                    <td><?= htmlspecialchars($action_type_lv) ?></td>
+                                    <td><?= $row['from_shelf'] ? htmlspecialchars($row['from_shelf']) : '-' ?></td>
+                                    <td><?= $row['to_shelf'] ? htmlspecialchars($row['to_shelf']) : '-' ?></td>
                                     <td><?= htmlspecialchars($row['quantity']) ?></td>
+                                    <td><?= htmlspecialchars($action_type_lv) ?></td>
+                                    <td><?= htmlspecialchars($row['user_name']) ?></td>
                                     <td><?= htmlspecialchars($row['notes']) ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php else: ?>
-                            <tr><td colspan="7" class="no-data">Nav atrasta neviena darbinieka darbība.</td></tr>
+                            <tr><td colspan="8" class="no-data">Nav atrasta neviena plauktu aktivitāte.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
             </section>
         </main>
     </div>
-
 </body>
 </html> 

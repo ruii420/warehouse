@@ -8,7 +8,6 @@ $filter = isset($_GET['category']) ? $_GET['category'] : null;
 $cat_stmt = $conn->query("SELECT DISTINCT category FROM products");
 $categories = $cat_stmt->fetch_all(MYSQLI_ASSOC);
 
-
 if ($filter) {
     $stmt = $conn->prepare("
         SELECT p.*, u.username
@@ -43,24 +42,31 @@ if ($filter) {
         <h1 class="logo">Stash</h1>
         <nav class="menu">
             <a href="index.php" class="menu-item active">🏠 Sākums</a>
+            
             <?php if (isset($_SESSION['permissions']['can_manage_inventory']) && $_SESSION['permissions']['can_manage_inventory']): ?>
                 <a href="manage_inventory.php" class="menu-item">📦 Izvietot preces</a>
             <?php endif; ?>
+            
             <?php if (isset($_SESSION['permissions']['can_make_order']) && $_SESSION['permissions']['can_make_order']): ?>
                 <a href="make_order.php" class="menu-item">🚚 Veikt pasūtījumu</a>
             <?php endif; ?>
+            
             <?php if (isset($_SESSION['permissions']['can_create_report']) && $_SESSION['permissions']['can_create_report']): ?>
                 <a href="create_report.php" class="menu-item">📄 Sagatavot atskaiti</a>
             <?php endif; ?>
+            
             <?php if (isset($_SESSION['permissions']['can_add_product']) && $_SESSION['permissions']['can_add_product']): ?>
                 <a href="add_product.php" class="menu-item">➕ Pievienot produktu</a>
             <?php endif; ?>
+            
             <?php if (isset($_SESSION['permissions']['can_add_user']) && $_SESSION['permissions']['can_add_user']): ?>
                 <a href="add_user.php" class="menu-item">👤 Pievienot lietotāju</a>
             <?php endif; ?>
+            
             <?php if (isset($_SESSION['permissions']['can_manage_users']) && $_SESSION['permissions']['can_manage_users']): ?>
                 <a href="manage_users.php" class="menu-item">👥 Lietotāji</a>
             <?php endif; ?>
+            
             <a href="logout.php" class="menu-item">➡️ Iziet</a>
         </nav>
     </aside>
@@ -93,10 +99,10 @@ if ($filter) {
                                 <td><?= htmlspecialchars($product['quantity']) ?></td>
                                 <td>
                                     <?php if (isset($_SESSION['permissions']['can_delete_product']) && $_SESSION['permissions']['can_delete_product']): ?>
-                                        <a href="delete_product.php?id=<?= $product['id'] ?>" class="action-button delete" onclick="return confirm('Are you sure you want to delete this product?');">Dzēst</a>
+                                        <a href="delete_product.php?id=<?= $product['id'] ?>" class="action-button delete" onclick="return confirm('Vai tiešām vēlaties dzēst šo produktu?');">Dzēst</a>
                                     <?php endif; ?>
                                     <?php if (isset($_SESSION['permissions']['can_edit_product']) && $_SESSION['permissions']['can_edit_product']): ?>
-                                        <a href="edit_product.php?id=<?= $product['id'] ?>" class="action-button edit">Pielāgot</a>
+                                        <a href="edit_product.php?id=<?= $product['id'] ?>" class="action-button edit">Rediģēt</a>
                                     <?php endif; ?>
                                 </td>
                             </tr>

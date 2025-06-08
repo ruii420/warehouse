@@ -6,18 +6,28 @@ require 'db.php';
 $msg = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'];
-    $pass = $_POST['password'];
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
 
-    $stmt = $conn->prepare("SELECT u.id, u.password, r.role_name, r.can_add_product, r.can_add_user, r.can_manage_users, r.can_create_report, r.can_make_order, r.can_manage_inventory, r.can_delete_product, r.can_edit_product FROM users u JOIN roles r ON u.role_id = r.id WHERE u.username = ?");
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $res = $stmt->get_result();
+    // Validate inputs
+    if (empty($username)) {
+        $msg = "Lūdzu ievadiet lietotājvārdu.";
+    } elseif (empty($password)) {
+        $msg = "Lūdzu ievadiet paroli.";
+    } else {
+        $stmt = $conn->prepare("SELECT u.id, u.password, r.* FROM users u JOIN roles r ON u.role_id = r.id WHERE u.username = ?");
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $user = $result->fetch_assoc();
 
-    if ($user = $res->fetch_assoc()) {
-        if (password_verify($pass, $user['password'])) {
+        if ($user && password_verify($password, $user['password'])) {
             $_SESSION['user_id'] = $user['id'];
-            $_SESSION['user_role'] = $user['role_name'];
+            
+            // Store role name in session (convert to lowercase for consistency)
+            $_SESSION['role'] = strtolower($user['role_name']);
+            
+            // Set permissions from roles table
             $_SESSION['permissions'] = [
                 'can_add_product' => (bool)$user['can_add_product'],
                 'can_add_user' => (bool)$user['can_add_user'],
@@ -28,33 +38,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'can_delete_product' => (bool)$user['can_delete_product'],
                 'can_edit_product' => (bool)$user['can_edit_product']
             ];
+            
             header("Location: index.php");
             exit;
         } else {
-            $msg = "Wrong password.";
+            $msg = "Nepareizs lietotājvārds vai parole.";
         }
-    } else {
-        $msg = "User not found.";
     }
 }
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="lv">
 <head>
-    <title>Login</title>
+    <meta charset="UTF-8">
+    <title>Pieslēgties</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="container2">
-    <h2>Login</h2>
-    <form method="POST">
-        <input name="username" placeholder="username" required>
-        <input name="password" type="password" placeholder="Password" required>
-        <button>Login</button>
-        <?php if ($msg): ?><p class="error"><?= $msg ?></p><?php endif; ?>
-    </form>
-    <p>Don't have an account? <a href="register.php" class="logout-link">Register here</a></p>
-</div>
+    <div class="container2">
+        <h2>Pieslēgties</h2>
+        <form method="POST">
+            <input type="text" name="username" placeholder="Lietotājvārds" value="<?= isset($username) ? htmlspecialchars($username) : '' ?>">
+            <input type="password" name="password" placeholder="Parole">
+            <button type="submit">Pieslēgties</button>
+            <?php if ($msg): ?><p class="error"><?= $msg ?></p><?php endif; ?>
+        </form>
+        <p>Nav konta? <a href="register.php" class="logout-link">Reģistrēties</a></p>
+    </div>
 </body>
 </html>

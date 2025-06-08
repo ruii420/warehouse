@@ -9,18 +9,26 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['permissions']['can_manage_
 
 $msg = '';
 
+// Define role display names
+$role_display_names = [
+    'Admin' => 'Administrators',
+    'Warehouse Worker' => 'Noliktavas Darbinieks',
+    'Shelf Organizer' => 'Plauktu Krāvējs',
+    'Regular User' => 'Parasts Lietotājs'
+];
+
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     $user_id = (int)$_GET['id'];
 
     if ($user_id == $_SESSION['user_id']) {
-        $msg = "You cannot delete your own account.";
+        $msg = "Jūs nevarat izdzēst savu kontu.";
     } else {
         $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
         $stmt->bind_param("i", $user_id);
         if ($stmt->execute()) {
-            $msg = "User deleted successfully!";
+            $msg = "Lietotājs veiksmīgi izdzēsts!";
         } else {
-            $msg = "Error deleting user: " . $stmt->error;
+            $msg = "Kļūda dzēšot lietotāju: " . $stmt->error;
         }
         $stmt->close();
     }
@@ -33,10 +41,10 @@ $conn->close();
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lv">
 <head>
     <meta charset="UTF-8">
-    <title>Manage Users</title>
+    <title>Lietotāju Pārvaldība</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -70,19 +78,23 @@ $conn->close();
 
     <main class="content">
         <header class="page-header">
-            <h2>Manage Users</h2>
+            <h2>Lietotāju Pārvaldība</h2>
         </header>
 
         <section class="table-section">
-            <?php if ($msg): ?><p class="message"><?= $msg ?></p><?php endif; ?>
+            <?php if ($msg): ?>
+                <p class="message <?= strpos($msg, 'veiksmīgi') !== false ? 'success' : 'error' ?>">
+                    <?= $msg ?>
+                </p>
+            <?php endif; ?>
             <table class="user-table">
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Username</th>
-                        <th>Role</th>
-                        <th>Created At</th>
-                        <th>Actions</th>
+                        <th>Lietotājvārds</th>
+                        <th>Loma</th>
+                        <th>Izveidots</th>
+                        <th>Darbības</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -91,18 +103,18 @@ $conn->close();
                             <tr>
                                 <td><?= htmlspecialchars($user['id']) ?></td>
                                 <td><?= htmlspecialchars($user['username']) ?></td>
-                                <td><?= htmlspecialchars($user['role_name']) ?></td>
+                                <td><?= htmlspecialchars($role_display_names[$user['role_name']] ?? $user['role_name']) ?></td>
                                 <td><?= htmlspecialchars($user['created_at']) ?></td>
                                 <td>
-                                    <a href="edit_user.php?id=<?= $user['id'] ?>" class="action-button edit">Edit</a>
+                                    <a href="edit_user.php?id=<?= $user['id'] ?>" class="action-button edit">Rediģēt</a>
                                     <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                        <a href="manage_users.php?action=delete&id=<?= $user['id'] ?>" class="action-button delete" onclick="return confirm('Are you sure you want to delete this user?');">Delete</a>
+                                        <a href="manage_users.php?action=delete&id=<?= $user['id'] ?>" class="action-button delete" onclick="return confirm('Vai tiešām vēlaties dzēst šo lietotāju?');">Dzēst</a>
                                     <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr><td colspan="5" class="no-users">No users found.</td></tr>
+                        <tr><td colspan="5" class="no-users">Nav atrasts neviens lietotājs.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
