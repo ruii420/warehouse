@@ -164,7 +164,6 @@ a.logout-link:hover {
     font-weight: bold;
 }
 
-/* Action Buttons */
 .action-button {
     display: inline-block;
     padding: 10px 15px;
@@ -181,7 +180,7 @@ a.logout-link:hover {
 }
 
 .action-button.edit {
-    background-color: #28a745; /* Green for Edit */
+    background-color: #28a745; 
 }
 
 .action-button.edit:hover {
@@ -189,7 +188,7 @@ a.logout-link:hover {
 }
 
 .action-button.delete {
-    background-color: #dc3545; /* Red for Delete */
+    background-color: #dc3545; 
 }
 
 .action-button.delete:hover {
