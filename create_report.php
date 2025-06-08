@@ -28,6 +28,9 @@ $conn->close();
             <?php if (isset($_SESSION['permissions']['can_manage_inventory']) && $_SESSION['permissions']['can_manage_inventory']): ?>
                 <a href="manage_inventory.php" class="menu-item">📦 Izvietot preces</a>
             <?php endif; ?>
+            <?php if (isset($_SESSION['permissions']['can_make_order']) && $_SESSION['permissions']['can_make_order']): ?>
+                <a href="make_order.php" class="menu-item">🚚 Veikt pasūtījumu</a>
+            <?php endif; ?>
             <?php if (isset($_SESSION['permissions']['can_create_report']) && $_SESSION['permissions']['can_create_report']): ?>
                 <a href="create_report.php" class="menu-item active">📄 Sagatavot atskaiti</a>
             <?php endif; ?>
@@ -52,8 +55,23 @@ $conn->close();
         <section class="report-section">
             <p>Select a report to generate:</p>
             <div class="report-buttons">
-                <a href="report_worker_actions.php" class="action-button">Darbinieku atskaite</a>
-                <a href="report_warehouse_orders.php" class="action-button">Pasūtījumu pārskats</a>
+                <?php if (isset($_SESSION['permissions']['can_create_report'])): ?>
+                    <?php if (isset($_SESSION['permissions']['can_make_order']) && $_SESSION['permissions']['can_make_order']):  ?>
+                        <a href="report_warehouse_orders.php" class="action-button">Pasūtījumu pārskats</a>
+                    <?php endif; ?>
+                    <?php 
+
+                        $is_shelf_organizer_or_admin = false;
+                        if (isset($_SESSION['user_role'])) {
+                            if ($_SESSION['user_role'] == 'Shelf Organizer' || $_SESSION['user_role'] == 'Admin') {
+                                $is_shelf_organizer_or_admin = true;
+                            }
+                        }
+                    ?>
+                    <?php if ($is_shelf_organizer_or_admin): ?>
+                        <a href="report_worker_actions.php" class="action-button">Produktu atskaite</a>
+                    <?php endif; ?>
+                <?php endif; ?>
             </div>
             <?php if ($msg): ?><p class="message"><?= $msg ?></p><?php endif; ?>
         </section>

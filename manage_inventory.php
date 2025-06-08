@@ -8,9 +8,21 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['permissions']['can_manage_
 }
 
 $msg = '';
+$products_result = [];
 
-$products_result = $conn->query("SELECT id, name, category, quantity FROM products");
-$products = $products_result->fetch_all(MYSQLI_ASSOC);
+$sort_columns = ['id', 'name', 'category', 'quantity'];
+$sort_by = isset($_GET['sort_by']) && in_array($_GET['sort_by'], $sort_columns) ? $_GET['sort_by'] : 'id';
+$sort_order = isset($_GET['sort_order']) && in_array(strtoupper($_GET['sort_order']), ['ASC', 'DESC']) ? strtoupper($_GET['sort_order']) : 'ASC';
+
+$sql = "SELECT id, name, category, quantity FROM products ORDER BY " . $sort_by . " " . $sort_order;
+$products_result = $conn->query($sql);
+
+if ($products_result) {
+    $products = $products_result->fetch_all(MYSQLI_ASSOC);
+} else {
+    $products = [];
+    $msg = "Error fetching products: " . $conn->error;
+}
 
 $conn->close();
 ?>
@@ -32,6 +44,9 @@ $conn->close();
             <?php if (isset($_SESSION['permissions']['can_manage_inventory']) && $_SESSION['permissions']['can_manage_inventory']): ?>
                 <a href="manage_inventory.php" class="menu-item active">📦 Izvietot preces</a>
             <?php endif; ?>
+            <?php if (isset($_SESSION['permissions']['can_make_order']) && $_SESSION['permissions']['can_make_order']): ?>
+                <a href="make_order.php" class="menu-item">🚚 Veikt pasūtījumu</a>
+            <?php endif; ?>
             <?php if (isset($_SESSION['permissions']['can_create_report']) && $_SESSION['permissions']['can_create_report']): ?>
                 <a href="create_report.php" class="menu-item">📄 Sagatavot atskaiti</a>
             <?php endif; ?>
@@ -51,6 +66,22 @@ $conn->close();
     <main class="content">
         <header class="page-header">
             <h2>Izvietot Preces (Inventory Management)</h2>
+            <div class="sort-controls">
+                <form action="manage_inventory.php" method="GET">
+                    <label for="sort_by">Sort by:</label>
+                    <select name="sort_by" id="sort_by" onchange="this.form.submit()">
+                        <option value="id" <?= $sort_by == 'id' ? 'selected' : '' ?>>ID</option>
+                        <option value="name" <?= $sort_by == 'name' ? 'selected' : '' ?>>Produkts</option>
+                        <option value="category" <?= $sort_by == 'category' ? 'selected' : '' ?>>Kategorija</option>
+                        <option value="quantity" <?= $sort_by == 'quantity' ? 'selected' : '' ?>>Daudzumus</option>
+                    </select>
+                    <label for="sort_order">Order:</label>
+                    <select name="sort_order" id="sort_order" onchange="this.form.submit()">
+                        <option value="ASC" <?= $sort_order == 'ASC' ? 'selected' : '' ?>>ASC</option>
+                        <option value="DESC" <?= $sort_order == 'DESC' ? 'selected' : '' ?>>DESC</option>
+                    </select>
+                </form>
+            </div>
         </header>
 
         <section class="table-section">
@@ -74,7 +105,12 @@ $conn->close();
                                 <td><?= htmlspecialchars($product['category']) ?></td>
                                 <td><?= htmlspecialchars($product['quantity']) ?></td>
                                 <td>
-                                    <a href="#" class="action-button edit">Adjust Quantity</a>
+                                    <?php if (isset($_SESSION['permissions']['can_edit_product']) && $_SESSION['permissions']['can_edit_product']): ?>
+                                        <a href="edit_product.php?id=<?= $product['id'] ?>" class="action-button edit">Rediģēt</a>
+                                    <?php endif; ?>
+                                    <?php if (isset($_SESSION['permissions']['can_delete_product']) && $_SESSION['permissions']['can_delete_product']): ?>
+                                        <a href="delete_product.php?id=<?= $product['id'] ?>" class="action-button delete" onclick="return confirm('Are you sure you want to delete this product?');">Dzēst</a>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

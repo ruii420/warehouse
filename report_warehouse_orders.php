@@ -23,12 +23,12 @@ $role_stmt->close();
 
 if ($warehouse_worker_role_id !== null) {
     $stmt = $conn->prepare("
-        SELECT il.id, p.name AS product_name, u.username AS worker_name, il.action, il.quantity, il.notes, il.created_at
-        FROM inventory_log il
-        JOIN products p ON il.product_id = p.id
-        JOIN users u ON il.user_id = u.id
-        WHERE u.role_id = ? AND il.action = 'remove' -- Filter by Warehouse Worker role and 'remove' action
-        ORDER BY il.created_at DESC
+        SELECT o.id, p.name AS product_name, u.username AS worker_name, o.order_quantity, o.old_quantity, o.new_quantity, o.order_time
+        FROM orders o
+        JOIN products p ON o.product_id = p.id
+        JOIN users u ON o.user_id = u.id
+        WHERE u.role_id = ? -- Filter by Warehouse Worker role
+        ORDER BY o.order_time DESC
     ");
     $stmt->bind_param("i", $warehouse_worker_role_id);
     $stmt->execute();
@@ -46,7 +46,7 @@ $conn->close();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Visas noliktavas darbinieka pasūtījumi</title>
+    <title>Pasūtījumu Pārskats</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -58,6 +58,9 @@ $conn->close();
             <a href="index.php" class="menu-item">🏠 Sākums</a>
             <?php if (isset($_SESSION['permissions']['can_manage_inventory']) && $_SESSION['permissions']['can_manage_inventory']): ?>
                 <a href="manage_inventory.php" class="menu-item">📦 Izvietot preces</a>
+            <?php endif; ?>
+            <?php if (isset($_SESSION['permissions']['can_make_order']) && $_SESSION['permissions']['can_make_order']): ?>
+                <a href="make_order.php" class="menu-item">🚚 Veikt pasūtījumu</a>
             <?php endif; ?>
             <?php if (isset($_SESSION['permissions']['can_create_report']) && $_SESSION['permissions']['can_create_report']): ?>
                 <a href="create_report.php" class="menu-item active">📄 Sagatavot atskaiti</a>
@@ -77,7 +80,7 @@ $conn->close();
 
     <main class="content">
         <header class="page-header">
-            <h2>Visas noliktavas darbinieka pasūtījumi</h2>
+            <h2>Pasūtījumu Pārskats</h2>
         </header>
 
         <section class="table-section">
@@ -88,9 +91,9 @@ $conn->close();
                         <th>ID</th>
                         <th>Produkts</th>
                         <th>Darbinieks</th>
-                        <th>Darbība</th>
-                        <th>Daudzums</th>
-                        <th>Piezīmes</th>
+                        <th>Pasūtījuma Daudzums</th>
+                        <th>Vecais Daudzums</th>
+                        <th>Jauns Daudzums</th>
                         <th>Datums</th>
                     </tr>
                 </thead>
@@ -101,10 +104,10 @@ $conn->close();
                                 <td><?= htmlspecialchars($row['id']) ?></td>
                                 <td><?= htmlspecialchars($row['product_name']) ?></td>
                                 <td><?= htmlspecialchars($row['worker_name']) ?></td>
-                                <td><?= htmlspecialchars($row['action']) ?></td>
-                                <td><?= htmlspecialchars($row['quantity']) ?></td>
-                                <td><?= htmlspecialchars($row['notes']) ?></td>
-                                <td><?= htmlspecialchars($row['created_at']) ?></td>
+                                <td><?= htmlspecialchars($row['order_quantity']) ?></td>
+                                <td><?= htmlspecialchars($row['old_quantity']) ?></td>
+                                <td><?= htmlspecialchars($row['new_quantity']) ?></td>
+                                <td><?= htmlspecialchars($row['order_time']) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>

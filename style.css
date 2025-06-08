@@ -201,3 +201,8 @@ a.logout-link:hover {
     gap: 15px;
     margin-top: 20px;
 }
+
+.product-table th a {
+    text-decoration: none;
+    color: inherit;
+}

@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = $_POST['username'];
     $pass = $_POST['password'];
 
-    $stmt = $conn->prepare("SELECT u.id, u.password, r.can_add_product, r.can_add_user, r.can_manage_users, r.can_create_report, r.can_make_order, r.can_manage_inventory, r.can_delete_product, r.can_edit_product FROM users u JOIN roles r ON u.role_id = r.id WHERE u.username = ?");
+    $stmt = $conn->prepare("SELECT u.id, u.password, r.role_name, r.can_add_product, r.can_add_user, r.can_manage_users, r.can_create_report, r.can_make_order, r.can_manage_inventory, r.can_delete_product, r.can_edit_product FROM users u JOIN roles r ON u.role_id = r.id WHERE u.username = ?");
     $stmt->bind_param("s", $username);
     $stmt->execute();
     $res = $stmt->get_result();
@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($user = $res->fetch_assoc()) {
         if (password_verify($pass, $user['password'])) {
             $_SESSION['user_id'] = $user['id'];
+            $_SESSION['user_role'] = $user['role_name'];
             $_SESSION['permissions'] = [
                 'can_add_product' => (bool)$user['can_add_product'],
                 'can_add_user' => (bool)$user['can_add_user'],

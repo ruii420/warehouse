@@ -46,6 +46,9 @@ if ($filter) {
             <?php if (isset($_SESSION['permissions']['can_manage_inventory']) && $_SESSION['permissions']['can_manage_inventory']): ?>
                 <a href="manage_inventory.php" class="menu-item">📦 Izvietot preces</a>
             <?php endif; ?>
+            <?php if (isset($_SESSION['permissions']['can_make_order']) && $_SESSION['permissions']['can_make_order']): ?>
+                <a href="make_order.php" class="menu-item">🚚 Veikt pasūtījumu</a>
+            <?php endif; ?>
             <?php if (isset($_SESSION['permissions']['can_create_report']) && $_SESSION['permissions']['can_create_report']): ?>
                 <a href="create_report.php" class="menu-item">📄 Sagatavot atskaiti</a>
             <?php endif; ?>
