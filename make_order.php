@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $update_stmt->bind_param("ii", $new_quantity, $product_id);
 
             if ($update_stmt->execute()) {
-                $msg = "Product quantity updated successfully (ordered: " . $order_quantity . ")!";
+                $msg = "Produktu daudzums atjaunināts veiksmīgi (pasūtīts: " . $order_quantity . ")!";
 
                 $order_stmt = $conn->prepare("INSERT INTO orders (product_id, user_id, order_quantity, old_quantity, new_quantity) VALUES (?, ?, ?, ?, ?)");
                 $order_stmt->bind_param("iiiii", $product_id, $user_id, $order_quantity, $current_product['quantity'], $new_quantity);
@@ -52,11 +52,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
             } else {
-                $msg = "Error updating product quantity: " . $conn->error;
+                $msg = "Error atjunojot produktu daudzumu: " . $conn->error;
             }
             $update_stmt->close();
         } else {
-            $msg = "Product not found.";
+            $msg = "Produkts nav atrast.";
         }
     }
 }

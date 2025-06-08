@@ -101,7 +101,6 @@ $conn->close();
 
         <section class="message-section">
             <?php if ($msg): ?><p class="message"><?= $msg ?></p><?php endif; ?>
-            <p>Redirecting back to the dashboard...</p>
         </section>
     </main>
 </div>

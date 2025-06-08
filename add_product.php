@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $msg = "Produkts veiksmīgi pievienots!";
-            // Clear form
+        
             $name = '';
             $description = '';
             $category = '';
