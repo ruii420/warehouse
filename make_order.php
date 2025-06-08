@@ -9,81 +9,55 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['permissions']['can_make_or
 $msg = '';
 $products = [];
 
-// Dabū visus produktus
-$products_result = $conn->query("SELECT id, name, quantity FROM products ORDER BY name");
+$products_result = $conn->query("SELECT id, name, quantity FROM products");
 if ($products_result) {
     $products = $products_result->fetch_all(MYSQLI_ASSOC);
 } else {
-    $msg = "Kļūda ielādējot produktus: " . $conn->error;
+    $msg = "Error fetching products: " . $conn->error;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $product_id = filter_var($_POST['product_id'], FILTER_VALIDATE_INT);
-    $order_quantity = filter_var($_POST['quantity'], FILTER_VALIDATE_INT);
-    $valid = true;
-    $errors = [];
+    $product_id = isset($_POST['product_id']) ? (int)$_POST['product_id'] : 0;
+    $order_quantity = isset($_POST['order_quantity']) ? (int)$_POST['order_quantity'] : 0;
+    $user_id = $_SESSION['user_id'];
 
-    if (!$product_id || $product_id <= 0) {
-        $valid = false;
-        $errors[] = "Lūdzu izvēlieties produktu.";
-    }
+    if ($product_id <= 0) {
+        $msg = "Please select a product.";
+    } elseif ($order_quantity <= 0) {
+        $msg = "Order quantity must be a positive number.";
+    } else {
+        $current_quantity_stmt = $conn->prepare("SELECT quantity FROM products WHERE id = ?");
+        $current_quantity_stmt->bind_param("i", $product_id);
+        $current_quantity_stmt->execute();
+        $current_quantity_result = $current_quantity_stmt->get_result();
+        $current_product = $current_quantity_result->fetch_assoc();
+        $current_quantity_stmt->close();
 
-    if ($order_quantity === false || $order_quantity <= 0) {
-        $valid = false;
-        $errors[] = "Daudzumam jābūt pozitīvam veselam skaitlim.";
-    } elseif (!preg_match("/^[0-9]+$/", $_POST['quantity'])) {
-        $valid = false;
-        $errors[] = "Daudzums var saturēt tikai ciparus.";
-    }
+        if ($current_product) {
+            $new_quantity = $current_product['quantity'] + $order_quantity;
 
-    if ($valid) {
-        $stmt = $conn->prepare("SELECT quantity, name FROM products WHERE id = ?");
-        $stmt->bind_param("i", $product_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $product = $result->fetch_assoc();
-        $stmt->close();
+            $update_stmt = $conn->prepare("UPDATE products SET quantity = ? WHERE id = ?");
+            $update_stmt->bind_param("ii", $new_quantity, $product_id);
 
-        if (!$product) {
-            $msg = "Produkts nav atrasts.";
-        } else {
-            $old_quantity = $product['quantity'];
-            $new_quantity = $old_quantity + $order_quantity;
+            if ($update_stmt->execute()) {
+                $msg = "Product quantity updated successfully (ordered: " . $order_quantity . ")!";
 
-            // Sāk pasūtījuma apstrādi
-            $conn->begin_transaction();
-
-            try {
-                $update_stmt = $conn->prepare("UPDATE products SET quantity = ? WHERE id = ?");
-                $update_stmt->bind_param("ii", $new_quantity, $product_id);
-                $update_stmt->execute();
-
-                // Saglabā pasūtījuma info
                 $order_stmt = $conn->prepare("INSERT INTO orders (product_id, user_id, order_quantity, old_quantity, new_quantity) VALUES (?, ?, ?, ?, ?)");
-                $order_stmt->bind_param("iiiii", $product_id, $_SESSION['user_id'], $order_quantity, $old_quantity, $new_quantity);
+                $order_stmt->bind_param("iiiii", $product_id, $user_id, $order_quantity, $current_product['quantity'], $new_quantity);
                 $order_stmt->execute();
-
-                $action_type = 'Pasūtījums';
-                $action_description = "Pasūtīti " . $order_quantity . " " . $product['name'] . " (Papildināts noliktavas krājums)";
-                $log_stmt = $conn->prepare("INSERT INTO inventory_log (product_id, user_id, action_type, quantity_change, new_quantity, action_description) VALUES (?, ?, ?, ?, ?, ?)");
-                $quantity_change = $order_quantity;
-                $log_stmt->bind_param("iisiss", $product_id, $_SESSION['user_id'], $action_type, $quantity_change, $new_quantity, $action_description);
-                $log_stmt->execute();
-
-                $conn->commit();
-                $msg = "Pasūtījums veiksmīgi izveidots! Noliktavas krājums papildināts.";
-
-                $products_result = $conn->query("SELECT id, name, quantity FROM products ORDER BY name");
+                $order_stmt->close();
+                $products_result = $conn->query("SELECT id, name, quantity FROM products");
                 if ($products_result) {
                     $products = $products_result->fetch_all(MYSQLI_ASSOC);
                 }
-            } catch (Exception $e) {
-                $conn->rollback();
-                $msg = "Kļūda veidojot pasūtījumu: " . $e->getMessage();
+
+            } else {
+                $msg = "Error updating product quantity: " . $conn->error;
             }
+            $update_stmt->close();
+        } else {
+            $msg = "Product not found.";
         }
-    } else {
-        $msg = implode("<br>", $errors);
     }
 }
 
@@ -91,7 +65,7 @@ $conn->close();
 ?>
 
 <!DOCTYPE html>
-<html lang="lv">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Veikt Pasūtījumu</title>
@@ -128,33 +102,29 @@ $conn->close();
 
     <main class="content">
         <header class="page-header">
-            <h2>Veikt Pasūtījumu (Papildināt Krājumus)</h2>
+            <h2>Veikt Pasūtījumu</h2>
         </header>
 
         <section class="form-section">
-            <?php if ($msg): ?>
-                <p class="message <?= strpos($msg, 'veiksmīgi') !== false ? 'success' : 'error' ?>">
-                    <?= $msg ?>
-                </p>
-            <?php endif; ?>
+            <?php if ($msg): ?><p class="message"><?= $msg ?></p><?php endif; ?>
 
             <form method="POST" class="order-form">
                 <div class="form-group">
                     <label for="product_id">Produkts:</label>
-                    <select id="product_id" name="product_id">
-                        <option value="">Izvēlieties produktu</option>
+                    <select id="product_id" name="product_id" required>
+                        <option value="">Select a product</option>
                         <?php foreach ($products as $product): ?>
                             <option value="<?= htmlspecialchars($product['id']) ?>">
-                                <?= htmlspecialchars($product['name']) ?> (Pašreizējais daudzums: <?= htmlspecialchars($product['quantity']) ?>)
+                                <?= htmlspecialchars($product['name']) ?> (Current Quantity: <?= htmlspecialchars($product['quantity']) ?>)
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="quantity">Pasūtāmais Daudzums:</label>
-                    <input type="text" id="quantity" name="quantity" value="<?= isset($_POST['quantity']) ? htmlspecialchars($_POST['quantity']) : '' ?>" placeholder="Ievadiet pasūtāmo daudzumu">
+                    <label for="order_quantity">Pasūtījuma Daudzums:</label>
+                    <input type="number" id="order_quantity" name="order_quantity" required min="1">
                 </div>
-                <button type="submit" class="button">Veikt Pasūtījumu</button>
+                <button type="submit" class="button">Pasūtīt</button>
             </form>
         </section>
     </main>

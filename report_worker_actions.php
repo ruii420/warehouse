@@ -21,7 +21,7 @@ if (!preg_match("/^\d{4}-\d{2}-\d{2}$/", $start_date) || !strtotime($start_date)
 }
 
 if (!preg_match("/^\d{4}-\d{2}-\d{2}$/", $end_date) || !strtotime($end_date)) {
-    $msg = "Nederīgs beigu datuma formāts. Lūdzu izmantojiet GGGG-MM-DD formātu.";
+    $msg = "Nederīgs beigu datuma formātu. Lūdzu izmantojiet GGGG-MM-DD formātu.";
     $end_date = date('Y-m-d');
     $valid_dates = false;
 }
@@ -61,8 +61,8 @@ if ($valid_dates) {
             il.action_description as notes,
             il.log_time as created_at
         FROM inventory_log il
-        JOIN products p ON il.product_id = p.id
-        JOIN users u ON il.user_id = u.id
+        LEFT JOIN products p ON il.product_id = p.id
+        LEFT JOIN users u ON il.user_id = u.id
         WHERE DATE(il.log_time) BETWEEN ? AND ?
     ";
 
@@ -205,11 +205,11 @@ $conn->close();
                                 <tr>
                                     <td><?= htmlspecialchars($row['id']) ?></td>
                                     <td><?= htmlspecialchars($row['created_at']) ?></td>
-                                    <td><?= htmlspecialchars($row['product_name']) ?></td>
-                                    <td><?= htmlspecialchars($row['worker_name']) ?></td>
-                                    <td><?= htmlspecialchars($action_type_lv) ?></td>
-                                    <td><?= htmlspecialchars($row['quantity']) ?></td>
-                                    <td><?= htmlspecialchars($row['notes']) ?></td>
+                                    <td><?= htmlspecialchars($row['product_name'] ?? '') ?></td>
+                                    <td><?= htmlspecialchars($row['worker_name'] ?? '') ?></td>
+                                    <td><?= htmlspecialchars($action_type_lv ?? '') ?></td>
+                                    <td><?= htmlspecialchars($row['quantity'] ?? '') ?></td>
+                                    <td><?= htmlspecialchars($row['notes'] ?? '') ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php else: ?>

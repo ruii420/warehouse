@@ -11,7 +11,6 @@ $msg = '';
 $user = null;
 $roles = [];
 
-// Define role display names
 $role_display_names = [
     'Admin' => 'Administrators',
     'Warehouse Worker' => 'Noliktavas Darbinieks',
@@ -19,13 +18,11 @@ $role_display_names = [
     'Regular User' => 'Parasts Lietotājs'
 ];
 
-// Get roles
 $roles_result = $conn->query("SELECT * FROM roles");
 if ($roles_result) {
     $roles = $roles_result->fetch_all(MYSQLI_ASSOC);
 }
 
-// Get current user's role
 $current_user_stmt = $conn->prepare("SELECT role_id FROM users WHERE id = ?");
 $current_user_stmt->bind_param("i", $_SESSION['user_id']);
 $current_user_stmt->execute();
@@ -52,12 +49,11 @@ if (isset($_GET['id'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user) {
     $username = trim($_POST['username']);
-    $password = $_POST['password']; // Only if changing password
+    $password = $_POST['password']; 
     $role_id = filter_var($_POST['role_id'], FILTER_VALIDATE_INT);
     $valid = true;
     $errors = [];
 
-    // Validate username
     if (empty($username)) {
         $valid = false;
         $errors[] = "Lietotājvārds ir obligāts.";
@@ -69,7 +65,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user) {
         $errors[] = "Lietotājvārds var saturēt tikai burtus un ciparus.";
     }
 
-    // Check if username exists (excluding current user)
     $stmt = $conn->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
     $stmt->bind_param("si", $username, $user['id']);
     $stmt->execute();
@@ -79,16 +74,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user) {
     }
     $stmt->close();
 
-    // Validate role
     if (!$role_id) {
         $valid = false;
         $errors[] = "Lūdzu izvēlieties derīgu lomu.";
     }
 
-    // Check if trying to modify own role
     if ($user['id'] == $_SESSION['user_id'] && $role_id != $user['role_id']) {
-        // Get count of admins
-        $admin_role_id = 1; // Assuming 1 is admin role ID
+        $admin_role_id = 1; 
         $admin_count_stmt = $conn->prepare("SELECT COUNT(*) as count FROM users WHERE role_id = ?");
         $admin_count_stmt->bind_param("i", $admin_role_id);
         $admin_count_stmt->execute();
@@ -96,14 +88,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user) {
         $admin_count = $admin_count_result->fetch_assoc()['count'];
         $admin_count_stmt->close();
 
-        // If current user is admin and trying to change their role
         if ($user['role_id'] == $admin_role_id && $admin_count <= 1) {
             $valid = false;
             $errors[] = "Nevar mainīt savu lomu, jo jūs esat vienīgais administrators.";
         }
     }
 
-    // Validate password if provided
     if (!empty($password)) {
         if (strlen($password) < 6) {
             $valid = false;
@@ -117,10 +107,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user) {
         }
     }
 
-    // Validate role change permissions
     if ($role_id != $user['role_id']) {
-        // Only admin can change roles
-        if ($current_user['role_id'] != 1) { // Assuming 1 is admin role ID
+        if ($current_user['role_id'] != 1) { 
             $valid = false;
             $errors[] = "Tikai administrators var mainīt lietotāju lomas.";
         }
@@ -131,12 +119,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user) {
             $conn->begin_transaction();
 
             if (!empty($password)) {
-                // Update with new password
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
                 $stmt = $conn->prepare("UPDATE users SET username = ?, password = ?, role_id = ? WHERE id = ?");
                 $stmt->bind_param("ssii", $username, $hashed_password, $role_id, $user['id']);
             } else {
-                // Update without changing password
                 $stmt = $conn->prepare("UPDATE users SET username = ?, role_id = ? WHERE id = ?");
                 $stmt->bind_param("sii", $username, $role_id, $user['id']);
             }
@@ -144,7 +130,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user) {
             if ($stmt->execute()) {
                 $conn->commit();
                 $msg = "Lietotājs veiksmīgi atjaunināts!";
-                // Refresh user data
                 $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
                 $stmt->bind_param("i", $user['id']);
                 $stmt->execute();
@@ -227,17 +212,23 @@ $conn->close();
                     <div class="form-group">
                         <label for="role_id">Loma:</label>
                         <select id="role_id" name="role_id">
-                            <?php foreach ($roles as $role): ?>
-                                <?php
-                                // Get display name if available, otherwise use database name
-                                $display_name = $role_display_names[$role['role_name']] ?? $role['role_name'];
+                            <?php 
+                            $current_user_role_id = isset($current_user['role_id']) ? $current_user['role_id'] : null;
+
+                            foreach ($roles as $role):
+                                if ($role['id'] != 1 || ($current_user_role_id !== null && $current_user_role_id == 1)): 
+                                   
+                                    $display_name = $role_display_names[$role['role_name']] ?? $role['role_name'];
                                 ?>
-                                <option value="<?= htmlspecialchars($role['id']) ?>" 
-                                    <?= $role['id'] == $user['role_id'] ? 'selected' : '' ?>
-                                    <?= ($current_user['role_id'] != 1 && $role['id'] != $user['role_id']) ? 'disabled' : '' ?>>
-                                    <?= htmlspecialchars($display_name) ?>
-                                </option>
-                            <?php endforeach; ?>
+                                    <option value="<?= htmlspecialchars($role['id']) ?>" 
+                                        <?= $role['id'] == $user['role_id'] ? 'selected' : '' ?>
+                                        <?= (isset($current_user['role_id']) && $current_user['role_id'] != 1 && $role['id'] != $user['role_id']) ? 'disabled' : '' ?>>
+                                        <?= htmlspecialchars($display_name) ?>
+                                    </option>
+                                <?php 
+                                endif; 
+                            endforeach; 
+                            ?>
                         </select>
                     </div>
                     <button type="submit" class="button">Saglabāt Izmaiņas</button>

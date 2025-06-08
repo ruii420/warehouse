@@ -65,10 +65,10 @@ if ($valid_dates) {
             u.username as user_name,
             sal.notes
         FROM shelf_activity_log sal
-        JOIN products p ON sal.product_id = p.id
+        LEFT JOIN products p ON sal.product_id = p.id
         LEFT JOIN shelves s1 ON sal.from_shelf_id = s1.id
         LEFT JOIN shelves s2 ON sal.to_shelf_id = s2.id
-        JOIN users u ON sal.user_id = u.id
+        LEFT JOIN users u ON sal.user_id = u.id
         WHERE DATE(sal.action_time) BETWEEN ? AND ?
     ";
 
@@ -213,13 +213,13 @@ $conn->close();
                                 ?>
                                 <tr>
                                     <td><?= htmlspecialchars($row['action_time']) ?></td>
-                                    <td><?= htmlspecialchars($row['product_name']) ?></td>
+                                    <td><?= htmlspecialchars($row['product_name'] ?? '') ?></td>
                                     <td><?= $row['from_shelf'] ? htmlspecialchars($row['from_shelf']) : '-' ?></td>
                                     <td><?= $row['to_shelf'] ? htmlspecialchars($row['to_shelf']) : '-' ?></td>
-                                    <td><?= htmlspecialchars($row['quantity']) ?></td>
-                                    <td><?= htmlspecialchars($action_type_lv) ?></td>
-                                    <td><?= htmlspecialchars($row['user_name']) ?></td>
-                                    <td><?= htmlspecialchars($row['notes']) ?></td>
+                                    <td><?= htmlspecialchars($row['quantity'] ?? '') ?></td>
+                                    <td><?= htmlspecialchars($action_type_lv ?? '') ?></td>
+                                    <td><?= htmlspecialchars($row['user_name'] ?? '') ?></td>
+                                    <td><?= htmlspecialchars($row['notes'] ?? '') ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php else: ?>

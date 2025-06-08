@@ -57,8 +57,8 @@ if ($valid_dates) {
             p.price,
             u.username as ordered_by
         FROM orders o
-        JOIN products p ON o.product_id = p.id
-        JOIN users u ON o.user_id = u.id
+        LEFT JOIN products p ON o.product_id = p.id
+        LEFT JOIN users u ON o.user_id = u.id
         WHERE DATE(o.order_time) BETWEEN ? AND ?
         ORDER BY o.order_time DESC
     ";
@@ -167,8 +167,8 @@ $conn->close();
                                 <tr>
                                     <td><?= htmlspecialchars($row['id']) ?></td>
                                     <td><?= htmlspecialchars($row['order_date']) ?></td>
-                                    <td><?= htmlspecialchars($row['ordered_by']) ?></td>
-                                    <td><?= htmlspecialchars($row['product_name']) ?></td>
+                                    <td><?= htmlspecialchars($row['ordered_by'] ?? '') ?></td>
+                                    <td><?= htmlspecialchars($row['product_name'] ?? '') ?></td>
                                     <td><?= htmlspecialchars($row['order_quantity']) ?></td>
                                     <td><?= htmlspecialchars($row['old_quantity']) ?></td>
                                     <td><?= htmlspecialchars($row['new_quantity']) ?></td>
