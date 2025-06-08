@@ -1,8 +1,7 @@
--- Create the warehouse database
+
 CREATE DATABASE IF NOT EXISTS warehouse;
 USE warehouse;
 
--- Create roles table
 CREATE TABLE IF NOT EXISTS roles (
     id INT AUTO_INCREMENT PRIMARY KEY,
     role_name VARCHAR(50) UNIQUE NOT NULL,
@@ -11,28 +10,27 @@ CREATE TABLE IF NOT EXISTS roles (
     can_manage_users BOOLEAN DEFAULT FALSE,
     can_create_report BOOLEAN DEFAULT FALSE,
     can_make_order BOOLEAN DEFAULT FALSE,
-    can_manage_inventory BOOLEAN DEFAULT FALSE
+    can_manage_inventory BOOLEAN DEFAULT FALSE,
+    can_delete_product BOOLEAN DEFAULT FALSE,
+    can_edit_product BOOLEAN DEFAULT FALSE
 );
 
--- Insert default roles
-INSERT IGNORE INTO roles (id, role_name, can_add_product, can_add_user, can_manage_users, can_create_report, can_make_order, can_manage_inventory) VALUES
-(1, 'Admin', TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
-(2, 'Warehouse Worker', TRUE, FALSE, FALSE, TRUE, TRUE, FALSE),
-(3, 'Regular User', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
-(4, 'Shelf Organizer', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE);
+INSERT IGNORE INTO roles (id, role_name, can_add_product, can_add_user, can_manage_users, can_create_report, can_make_order, can_manage_inventory, can_delete_product, can_edit_product) VALUES
+(1, 'Admin', TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+(2, 'Warehouse Worker', TRUE, FALSE, FALSE, TRUE, TRUE, FALSE, TRUE, TRUE),
+(3, 'Regular User', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
+(4, 'Shelf Organizer', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE);
 
 
--- Create users table
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role_id INT DEFAULT 3, -- Default to Regular User
+    role_id INT DEFAULT 3, 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (role_id) REFERENCES roles(id)
 );
 
--- Create products table
 CREATE TABLE IF NOT EXISTS products (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -47,7 +45,6 @@ CREATE TABLE IF NOT EXISTS products (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- Create inventory_log table
 CREATE TABLE IF NOT EXISTS inventory_log (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,

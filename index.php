@@ -88,6 +88,14 @@ if ($filter) {
                                 <td>&euro;<?= htmlspecialchars($product['price']) ?></td>
                                 <td><?= htmlspecialchars($product['company_id']) ?></td>
                                 <td><?= htmlspecialchars($product['quantity']) ?></td>
+                                <td>
+                                    <?php if (isset($_SESSION['permissions']['can_delete_product']) && $_SESSION['permissions']['can_delete_product']): ?>
+                                        <a href="delete_product.php?id=<?= $product['id'] ?>" class="action-button delete" onclick="return confirm('Are you sure you want to delete this product?');">Dzēst</a>
+                                    <?php endif; ?>
+                                    <?php if (isset($_SESSION['permissions']['can_edit_product']) && $_SESSION['permissions']['can_edit_product']): ?>
+                                        <a href="edit_product.php?id=<?= $product['id'] ?>" class="action-button edit">Pielāgot</a>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
