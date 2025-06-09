@@ -382,44 +382,7 @@ button[type="submit"] {
     opacity: 0;
 }
 
-@media (max-width: 768px) {
-    .sidebar {
-        width: 100%;
-        position: relative;
-        height: auto;
-    }
 
-    .content {
-        margin-left: 0;
-    }
-
-    .form-inline {
-        flex-direction: column;
-    }
-
-    .form-group {
-        width: 100%;
-    }
-
-    .container2 {
-        margin: 20px;
-        width: auto;
-    }
-}
-
-@media print {
-    .sidebar {
-        display: none;
-    }
-
-    .content {
-        margin-left: 0;
-    }
-
-    .no-print {
-        display: none;
-    }
-}
 
 .shelf-grid {
     display: grid;
