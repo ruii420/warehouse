@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $source = $source_stmt->get_result()->fetch_assoc();
 
                 if (!$source || $source['quantity'] < $quantity) {
-                    $msg = "Kļūda: Nav pietiekama daudzuma avota plauktā.";
+                    $msg = "Kļūda: Nav pietiekama daudzuma sākuma plauktā.";
                 } else {
                     $shelf_stmt = $conn->prepare("SELECT capacity, 
                         (SELECT COALESCE(SUM(quantity), 0) FROM product_locations WHERE shelf_id = shelves.id) as used_capacity 
@@ -260,7 +260,7 @@ $conn->close();
             <form method="POST" action="">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="transfer_product_id">Produkts un Avota Plaukts:</label>
+                        <label for="transfer_product_id">Produkts un sākuma Plaukts:</label>
                         <select name="product_id" id="transfer_product_id">
                             <option value="">Izvēlieties produktu un plauktu</option>
                             <?php foreach ($grouped_locations as $group): ?>
