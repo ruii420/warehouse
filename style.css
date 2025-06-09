@@ -462,3 +462,17 @@ button[type="submit"]:hover,
     margin-top: 30px;
 }
 
+
+.product-table tr.same-product td:first-child {
+    border-top: none;
+    visibility: hidden;
+}
+
+.product-table tr:not(.same-product) {
+    border-top: 2px solid #ddd;
+}
+
+.product-table tr:first-child {
+    border-top: none;
+}
+

@@ -28,26 +28,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else if ($action === 'transfer' && ($from_shelf_id === false || $from_shelf_id === null || $to_shelf_id === false || $to_shelf_id === null)) {
             $msg = "Kļūda: Jānorāda abi plaukti.";
         } else {
-        
-            $conn->begin_transaction();
+            $product_stmt = $conn->prepare("SELECT quantity, name FROM products WHERE id = ?");
+            $product_stmt->bind_param("i", $product_id);
+            $product_stmt->execute();
+            $product = $product_stmt->get_result()->fetch_assoc();
 
-            try {
-            
-                $product_stmt = $conn->prepare("SELECT quantity, name FROM products WHERE id = ?");
-                $product_stmt->bind_param("i", $product_id);
-                $product_stmt->execute();
-                $product = $product_stmt->get_result()->fetch_assoc();
-
-                if (!$product) {
-                    throw new Exception("Produkts nav atrasts.");
-                }
-
-                if ($action === 'place') {
-                    if ($product['quantity'] < $quantity) {
-                        throw new Exception("Nav pietiekams produkta daudzums noliktavā.");
-                    }
-
-                  
+            if (!$product) {
+                $msg = "Kļūda: Produkts nav atrasts.";
+            } else if ($action === 'place') {
+                if ($product['quantity'] < $quantity) {
+                    $msg = "Kļūda: Nav pietiekams produkta daudzums noliktavā.";
+                } else {
                     $shelf_stmt = $conn->prepare("SELECT capacity, shelf_code,
                         (SELECT COALESCE(SUM(quantity), 0) FROM product_locations WHERE shelf_id = shelves.id) as used_capacity 
                         FROM shelves WHERE id = ?");
@@ -56,53 +47,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $shelf = $shelf_stmt->get_result()->fetch_assoc();
 
                     if (!$shelf) {
-                        throw new Exception("Plaukts nav atrasts.");
+                        $msg = "Kļūda: Plaukts nav atrasts.";
+                    } else if ($shelf['capacity'] < ($shelf['used_capacity'] + $quantity)) {
+                        $msg = "Kļūda: Nav pietiekamas vietas plauktā. (Pieejams: " . ($shelf['capacity'] - $shelf['used_capacity']) . ")";
+                    } else {
+                        $update_product = $conn->prepare("UPDATE products SET quantity = quantity - ? WHERE id = ?");
+                        $update_product->bind_param("ii", $quantity, $product_id);
+                        $update_product->execute();
+
+                        $place_stmt = $conn->prepare("INSERT INTO product_locations (product_id, shelf_id, quantity, updated_by) VALUES (?, ?, ?, ?)");
+                        $place_stmt->bind_param("iiii", $product_id, $to_shelf_id, $quantity, $_SESSION['user_id']);
+                        $place_stmt->execute();
+
+                        $log_stmt = $conn->prepare("INSERT INTO shelf_activity_log (product_id, to_shelf_id, quantity, action_type, user_id, notes) VALUES (?, ?, ?, 'Novietošana', ?, ?)");
+                        $notes = "Prece novietota plauktā";
+                        $log_stmt->bind_param("iiiis", $product_id, $to_shelf_id, $quantity, $_SESSION['user_id'], $notes);
+                        $log_stmt->execute();
+
+                        $action_type = 'Novietošana';
+                        $new_quantity = $product['quantity'] - $quantity;
+                        $action_description = "Novietoti " . $quantity . " " . $product['name'] . " plauktā " . $shelf['shelf_code'];
+                        
+                        $inventory_log_stmt = $conn->prepare("INSERT INTO inventory_log (product_id, user_id, action_type, quantity_change, new_quantity, action_description) VALUES (?, ?, ?, ?, ?, ?)");
+                        $inventory_log_stmt->bind_param("iisiss", $product_id, $_SESSION['user_id'], $action_type, $quantity, $new_quantity, $action_description);
+                        $inventory_log_stmt->execute();
+
+                        $success_msg = "Produkts veiksmīgi novietots plauktā!";
                     }
+                }
+            } else if ($action === 'transfer') {
+                $source_stmt = $conn->prepare("SELECT quantity FROM product_locations WHERE product_id = ? AND shelf_id = ?");
+                $source_stmt->bind_param("ii", $product_id, $from_shelf_id);
+                $source_stmt->execute();
+                $source = $source_stmt->get_result()->fetch_assoc();
 
-                    if ($shelf['capacity'] < ($shelf['used_capacity'] + $quantity)) {
-                        throw new Exception("Nav pietiekamas vietas plauktā. (Pieejams: " . ($shelf['capacity'] - $shelf['used_capacity']) . ")");
-                    }
-
-                    $update_product = $conn->prepare("UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?");
-                    $update_product->bind_param("iii", $quantity, $product_id, $quantity);
-                    $update_product->execute();
-
-                    if ($update_product->affected_rows === 0) {
-                        throw new Exception("Produkta daudzums ir mainījies. Lūdzu, mēģiniet vēlreiz.");
-                    }
-
-                   
-                    $place_stmt = $conn->prepare("INSERT INTO product_locations (product_id, shelf_id, quantity, updated_by) VALUES (?, ?, ?, ?)");
-                    $place_stmt->bind_param("iiii", $product_id, $to_shelf_id, $quantity, $_SESSION['user_id']);
-                    $place_stmt->execute();
-
-                   
-                    $log_stmt = $conn->prepare("INSERT INTO shelf_activity_log (product_id, to_shelf_id, quantity, action_type, user_id, notes) VALUES (?, ?, ?, 'Novietošana', ?, ?)");
-                    $notes = "Prece novietota plauktā";
-                    $log_stmt->bind_param("iiiis", $product_id, $to_shelf_id, $quantity, $_SESSION['user_id'], $notes);
-                    $log_stmt->execute();
-
-                    $action_type = 'Novietošana';
-                    $new_quantity = $product['quantity'] - $quantity;
-                    $action_description = "Novietoti " . $quantity . " " . $product['name'] . " plauktā " . $shelf['shelf_code'];
-                    
-                    $inventory_log_stmt = $conn->prepare("INSERT INTO inventory_log (product_id, user_id, action_type, quantity_change, new_quantity, action_description) VALUES (?, ?, ?, ?, ?, ?)");
-                    $inventory_log_stmt->bind_param("iisiss", $product_id, $_SESSION['user_id'], $action_type, $quantity, $new_quantity, $action_description);
-                    $inventory_log_stmt->execute();
-
-                    $success_msg = "Produkts veiksmīgi novietots plauktā!";
-                } elseif ($action === 'transfer') {
-                 
-                    $source_stmt = $conn->prepare("SELECT quantity FROM product_locations WHERE product_id = ? AND shelf_id = ?");
-                    $source_stmt->bind_param("ii", $product_id, $from_shelf_id);
-                    $source_stmt->execute();
-                    $source = $source_stmt->get_result()->fetch_assoc();
-
-                    if (!$source || $source['quantity'] < $quantity) {
-                        throw new Exception("Nav pietiekama daudzuma avota plauktā.");
-                    }
-
-                  
+                if (!$source || $source['quantity'] < $quantity) {
+                    $msg = "Kļūda: Nav pietiekama daudzuma avota plauktā.";
+                } else {
                     $shelf_stmt = $conn->prepare("SELECT capacity, 
                         (SELECT COALESCE(SUM(quantity), 0) FROM product_locations WHERE shelf_id = shelves.id) as used_capacity 
                         FROM shelves WHERE id = ?");
@@ -111,33 +92,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $shelf = $shelf_stmt->get_result()->fetch_assoc();
 
                     if ($shelf['capacity'] < ($shelf['used_capacity'] + $quantity)) {
-                        throw new Exception("Nav pietiekamas vietas galamērķa plauktā.");
+                        $msg = "Kļūda: Nav pietiekamas vietas galamērķa plauktā.";
+                    } else {
+                        $update_source = $conn->prepare("UPDATE product_locations SET quantity = quantity - ? WHERE product_id = ? AND shelf_id = ?");
+                        $update_source->bind_param("iii", $quantity, $product_id, $from_shelf_id);
+                        $update_source->execute();
+
+                        $update_dest = $conn->prepare("INSERT INTO product_locations (product_id, shelf_id, quantity, updated_by) 
+                            VALUES (?, ?, ?, ?) 
+                            ON DUPLICATE KEY UPDATE quantity = quantity + ?");
+                        $update_dest->bind_param("iiiii", $product_id, $to_shelf_id, $quantity, $_SESSION['user_id'], $quantity);
+                        $update_dest->execute();
+
+                        $log_stmt = $conn->prepare("INSERT INTO shelf_activity_log (product_id, from_shelf_id, to_shelf_id, quantity, action_type, user_id, notes) VALUES (?, ?, ?, ?, 'Pārvietošana', ?, ?)");
+                        $notes = "Prece pārvietota starp plauktiem";
+                        $log_stmt->bind_param("iiiiss", $product_id, $from_shelf_id, $to_shelf_id, $quantity, $_SESSION['user_id'], $notes);
+                        $log_stmt->execute();
+
+                        $success_msg = "Produkts veiksmīgi pārvietots!";
                     }
-
-                    $update_source = $conn->prepare("UPDATE product_locations SET quantity = quantity - ? WHERE product_id = ? AND shelf_id = ?");
-                    $update_source->bind_param("iii", $quantity, $product_id, $from_shelf_id);
-                    $update_source->execute();
-
-                  
-                    $update_dest = $conn->prepare("INSERT INTO product_locations (product_id, shelf_id, quantity, updated_by) 
-                        VALUES (?, ?, ?, ?) 
-                        ON DUPLICATE KEY UPDATE quantity = quantity + ?");
-                    $update_dest->bind_param("iiiii", $product_id, $to_shelf_id, $quantity, $_SESSION['user_id'], $quantity);
-                    $update_dest->execute();
-
-                
-                    $log_stmt = $conn->prepare("INSERT INTO shelf_activity_log (product_id, from_shelf_id, to_shelf_id, quantity, action_type, user_id, notes) VALUES (?, ?, ?, ?, 'Pārvietošana', ?, ?)");
-                    $notes = "Prece pārvietota starp plauktiem";
-                    $log_stmt->bind_param("iiiiss", $product_id, $from_shelf_id, $to_shelf_id, $quantity, $_SESSION['user_id'], $notes);
-                    $log_stmt->execute();
-
-                    $success_msg = "Produkts veiksmīgi pārvietots!";
                 }
-
-                $conn->commit();
-            } catch (Exception $e) {
-                $conn->rollback();
-                $msg = "Kļūda: " . $e->getMessage();
             }
         }
     }
@@ -149,11 +123,9 @@ $products = $products_result->fetch_all(MYSQLI_ASSOC);
 
 $shelves_result = $conn->query("
     SELECT s.*, 
-        COALESCE(SUM(pl.quantity), 0) as used_capacity,
-        GROUP_CONCAT(CONCAT(p.name, ': ', pl.quantity) SEPARATOR ', ') as contents
+        COALESCE(SUM(pl.quantity), 0) as used_capacity
     FROM shelves s
     LEFT JOIN product_locations pl ON s.id = pl.shelf_id
-    LEFT JOIN products p ON pl.product_id = p.id
     GROUP BY s.id
     ORDER BY s.section, s.shelf_code
 ");
@@ -161,13 +133,37 @@ $shelves = $shelves_result->fetch_all(MYSQLI_ASSOC);
 
 
 $locations_result = $conn->query("
-    SELECT pl.*, s.shelf_code, s.section, p.name as product_name
+    SELECT 
+        p.id as product_id,
+        p.name as product_name,
+        s.shelf_code,
+        CONCAT('Sekcija ', SUBSTRING(s.section, -1)) as section,
+        pl.quantity
     FROM product_locations pl
     JOIN shelves s ON pl.shelf_id = s.id
     JOIN products p ON pl.product_id = p.id
-    ORDER BY s.section, s.shelf_code
+    ORDER BY p.name, s.shelf_code
 ");
 $locations = $locations_result->fetch_all(MYSQLI_ASSOC);
+
+// Group locations by product for the transfer dropdown
+$grouped_locations = [];
+foreach ($locations as $location) {
+    $product_id = $location['product_id'];
+    if (!isset($grouped_locations[$product_id])) {
+        $grouped_locations[$product_id] = [
+            'product_id' => $product_id,
+            'product_name' => $location['product_name'],
+            'total_quantity' => 0,
+            'locations' => []
+        ];
+    }
+    $grouped_locations[$product_id]['total_quantity'] += $location['quantity'];
+    $grouped_locations[$product_id]['locations'][] = [
+        'shelf_code' => $location['shelf_code'],
+        'quantity' => $location['quantity']
+    ];
+}
 
 $conn->close();
 ?>
@@ -178,7 +174,6 @@ $conn->close();
     <meta charset="UTF-8">
     <title>Izvietot Preces</title>
     <link rel="stylesheet" href="style.css">
-   
 </head>
 <body>
 
@@ -211,7 +206,7 @@ $conn->close();
 
     <main class="content">
         <header class="page-header">
-            <h2>Izvietot Preces (Plauktu Pārvaldība)</h2>
+            <h2>Izvietot Preces</h2>
         </header>
 
         <?php if ($msg): ?>
@@ -268,14 +263,16 @@ $conn->close();
                         <label for="transfer_product_id">Produkts un Avota Plaukts:</label>
                         <select name="product_id" id="transfer_product_id" required>
                             <option value="">Izvēlieties produktu un plauktu</option>
-                            <?php foreach ($locations as $location): ?>
-                                <option value="<?= $location['product_id'] ?>" data-shelf="<?= $location['shelf_id'] ?>">
-                                    <?= htmlspecialchars($location['product_name']) ?> - 
-                                    <?= htmlspecialchars($location['shelf_code']) ?> 
-                                    (Daudzums: <?= $location['quantity'] ?>)
-                                </option>
+                            <?php foreach ($grouped_locations as $group): ?>
+                                <?php foreach ($group['locations'] as $loc): ?>
+                                    <option value="<?= $group['product_id'] ?>" data-shelf="<?= $loc['shelf_code'] ?>">
+                                        <?= htmlspecialchars($group['product_name']) ?> - 
+                                        <?= htmlspecialchars($loc['shelf_code']) ?> 
+                                        (Daudzums: <?= $loc['quantity'] ?>)
+                                    </option>
+                                <?php endforeach; ?>
                             <?php endforeach; ?>
-                    </select>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="transfer_quantity">Daudzums:</label>
@@ -308,10 +305,6 @@ $conn->close();
                     <div class="shelf-card">
                         <h3><?= htmlspecialchars($shelf['shelf_code']) ?> - Sekcija <?= substr($shelf['section'], -1) ?></h3>
                         <p>Kapacitāte: <?= $shelf['used_capacity'] ?>/<?= $shelf['capacity'] ?></p>
-                        <div class="shelf-contents">
-                            <strong>Saturs:</strong><br>
-                            <?= $shelf['contents'] ? htmlspecialchars($shelf['contents']) : 'Tukšs' ?>
-                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -327,22 +320,31 @@ $conn->close();
                         <th>Plaukts</th>
                         <th>Sekcija</th>
                         <th>Daudzums</th>
-                        <th>Pēdējā Atjaunināšana</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($locations)): ?>
-                        <?php foreach ($locations as $location): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($location['product_name']) ?></td>
+                        <?php 
+                        $current_product = '';
+                        foreach ($locations as $location): 
+                            $is_new_product = $current_product !== $location['product_name'];
+                            if ($is_new_product) {
+                                $current_product = $location['product_name'];
+                            }
+                        ?>
+                            <tr <?= $is_new_product ? '' : 'class="same-product"' ?>>
+                                <td>
+                                    <?php if ($is_new_product): ?>
+                                        <?= htmlspecialchars($location['product_name']) ?>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?= htmlspecialchars($location['shelf_code']) ?></td>
-                                <td>Sekcija <?= substr($location['section'], -1) ?></td>
+                                <td><?= htmlspecialchars($location['section']) ?></td>
                                 <td><?= htmlspecialchars($location['quantity']) ?></td>
-                                <td><?= htmlspecialchars($location['last_updated']) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr><td colspan="5" class="no-data">Nav atrasta neviena produkta atrašanās vieta.</td></tr>
+                        <tr><td colspan="4" class="no-data">Nav atrasta neviena produkta atrašanās vieta.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
