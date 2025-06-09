@@ -84,15 +84,11 @@ if ($valid_dates) {
 $total_actions = count($report_data);
 $total_quantity = 0;
 $actions_by_worker = [];
-$actions_by_type = [];
 
 foreach ($report_data as $action) {
     $total_quantity += abs($action['quantity']);
     $worker = $action['worker_name'];
-    $type = $action['action_type'];
-    
     $actions_by_worker[$worker] = ($actions_by_worker[$worker] ?? 0) + 1;
-    $actions_by_type[$type] = ($actions_by_type[$type] ?? 0) + 1;
 }
 
 $most_active_worker = !empty($actions_by_worker) ? array_search(max($actions_by_worker), $actions_by_worker) : '-';
