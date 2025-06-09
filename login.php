@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
+    
     if (empty($username)) {
         $msg = "Lūdzu ievadiet lietotājvārdu.";
     } elseif (empty($password)) {
@@ -23,8 +24,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($user && password_verify($password, $user['password'])) {
             $_SESSION['user_id'] = $user['id'];
             
+           
             $_SESSION['role'] = strtolower($user['role_name']);
             
+          
             $_SESSION['permissions'] = [
                 'can_add_product' => (bool)$user['can_add_product'],
                 'can_add_user' => (bool)$user['can_add_user'],

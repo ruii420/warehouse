@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['permissions']['can_manage_
 
 $msg = '';
 
+
 $role_display_names = [
     'Admin' => 'Administrators',
     'Warehouse Worker' => 'Noliktavas Darbinieks',

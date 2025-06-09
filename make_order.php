@@ -21,10 +21,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $order_quantity = isset($_POST['order_quantity']) ? (int)$_POST['order_quantity'] : 0;
     $user_id = $_SESSION['user_id'];
 
-    if ($product_id <= 0) {
-        $msg = "Please select a product.";
+    if (empty($_POST['product_id'])) {
+        $msg = "Kļūda: Lūdzu izvēlieties produktu.";
+    } elseif (empty($_POST['order_quantity'])) {
+        $msg = "Kļūda: Lūdzu ievadiet pasūtījuma daudzumu.";
     } elseif ($order_quantity <= 0) {
-        $msg = "Order quantity must be a positive number.";
+        $msg = "Kļūda: Pasūtījuma daudzumam jābūt lielākam par 0.";
     } else {
         $current_quantity_stmt = $conn->prepare("SELECT quantity FROM products WHERE id = ?");
         $current_quantity_stmt->bind_param("i", $product_id);
@@ -40,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $update_stmt->bind_param("ii", $new_quantity, $product_id);
 
             if ($update_stmt->execute()) {
-                $msg = "Product quantity updated successfully (ordered: " . $order_quantity . ")!";
+                $msg = "Produktu daudzums atjaunināts veiksmīgi (pasūtīts: " . $order_quantity . ")!";
 
                 $order_stmt = $conn->prepare("INSERT INTO orders (product_id, user_id, order_quantity, old_quantity, new_quantity) VALUES (?, ?, ?, ?, ?)");
                 $order_stmt->bind_param("iiiii", $product_id, $user_id, $order_quantity, $current_product['quantity'], $new_quantity);
@@ -52,11 +54,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
             } else {
-                $msg = "Error updating product quantity: " . $conn->error;
+                $msg = "Error atjunojot produktu daudzumu: " . $conn->error;
             }
             $update_stmt->close();
         } else {
-            $msg = "Product not found.";
+            $msg = "Produkts nav atrast.";
         }
     }
 }
@@ -106,23 +108,27 @@ $conn->close();
         </header>
 
         <section class="form-section">
-            <?php if ($msg): ?><p class="message"><?= $msg ?></p><?php endif; ?>
+            <?php if ($msg): ?>
+                <p class="message <?= strpos($msg, 'veiksmīgi') !== false ? 'success' : 'error' ?>">
+                    <?= htmlspecialchars($msg) ?>
+                </p>
+            <?php endif; ?>
 
             <form method="POST" class="order-form">
                 <div class="form-group">
                     <label for="product_id">Produkts:</label>
-                    <select id="product_id" name="product_id" required>
-                        <option value="">Select a product</option>
+                    <select id="product_id" name="product_id">
+                        <option value="">Izvēlieties produktu</option>
                         <?php foreach ($products as $product): ?>
                             <option value="<?= htmlspecialchars($product['id']) ?>">
-                                <?= htmlspecialchars($product['name']) ?> (Current Quantity: <?= htmlspecialchars($product['quantity']) ?>)
+                                <?= htmlspecialchars($product['name']) ?> (Pieejams: <?= htmlspecialchars($product['quantity']) ?>)
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="order_quantity">Pasūtījuma Daudzums:</label>
-                    <input type="number" id="order_quantity" name="order_quantity" required min="1">
+                    <input type="number" id="order_quantity" name="order_quantity" min="1">
                 </div>
                 <button type="submit" class="button">Pasūtīt</button>
             </form>

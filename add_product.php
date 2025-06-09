@@ -29,6 +29,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = "Kategorija var saturēt tikai burtus, ciparus un pasvītrojumus.";
     } elseif (!preg_match("/^[a-zA-Z0-9_]+$/", $company_id)) {
         $msg = "Uzņēmuma ID var saturēt tikai burtus, ciparus un pasvītrojums.";
+    } elseif (strlen($description) > 500) {
+        $msg = "Apraksts nevar būt garāks par 500 simboliem.";
+    } elseif (!preg_match("/^[a-zA-Z0-9\s\.,\-]+$/u", $description)) {
+        $msg = "Apraksts var saturēt tikai burtus, ciparus, atstarpes, punktus, komatus un domuzīmes.";
     } elseif ($quantity === false || $quantity < 0 || !preg_match("/^[0-9]+$/", $_POST['quantity'])) {
         $msg = "Daudzumam jābūt pozitīvam veselam skaitlim.";
     } elseif ($price === false || $price <= 0 || !preg_match("/^[0-9]+\.?[0-9]*$/", $_POST['price'])) {
@@ -50,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $msg = "Produkts veiksmīgi pievienots!";
-            // Clear form
+        
             $name = '';
             $description = '';
             $category = '';

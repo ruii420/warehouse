@@ -37,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $valid = true;
     $errors = [];
 
+
     if (empty($username)) {
         $valid = false;
         $errors[] = "Lietotājvārds ir obligāts.";
@@ -47,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $valid = false;
         $errors[] = "Lietotājvārds var saturēt tikai burtus un ciparus.";
     }
+
 
     $stmt = $conn->prepare("SELECT id FROM users WHERE username = ?");
     $stmt->bind_param("s", $username);
@@ -85,36 +87,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
    
-    if ($role_id == 1 && $current_user['role_id'] != 1) { 
-        $valid = false;
-        $errors[] = "Tikai administrators var piešķirt administratora lomu.";
-    }
+   
 
-    if ($valid) {
-        try {
-            $conn->begin_transaction();
+   if ($valid) {
+    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-         
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    $stmt = $conn->prepare("INSERT INTO users (username, password, role_id) VALUES (?, ?, ?)");
+    $stmt->bind_param("ssi", $username, $hashed_password, $role_id);
 
-         
-            $stmt = $conn->prepare("INSERT INTO users (username, password, role_id) VALUES (?, ?, ?)");
-            $stmt->bind_param("ssi", $username, $hashed_password, $role_id);
-
-            if ($stmt->execute()) {
-                $conn->commit();
-                $msg = "Lietotājs veiksmīgi pievienots!";
-                
-                $username = '';
-            } else {
-                throw new Exception($stmt->error);
-            }
-            $stmt->close();
-        } catch (Exception $e) {
-            $conn->rollback();
-            $msg = "Kļūda pievienojot lietotāju: " . $e->getMessage();
-        }
+    if ($stmt->execute()) {
+        $msg = "Lietotājs veiksmīgi pievienots!";
+        $username = '';
     } else {
+        $msg = "Kļūda pievienojot lietotāju: " . $stmt->error;
+    }
+    $stmt->close();
+ } else {
         $msg = implode("<br>", $errors);
     }
 }

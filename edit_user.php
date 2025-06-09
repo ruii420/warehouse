@@ -107,42 +107,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user) {
         }
     }
 
-    if ($role_id != $user['role_id']) {
-        if ($current_user['role_id'] != 1) { 
-            $valid = false;
-            $errors[] = "Tikai administrators var mainīt lietotāju lomas.";
+    
+
+   if ($valid) {
+        if (!empty($password)) {
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $conn->prepare("UPDATE users SET username = ?, password = ?, role_id = ? WHERE id = ?");
+            $stmt->bind_param("ssii", $username, $hashed_password, $role_id, $user['id']);
+        } else {
+            $stmt = $conn->prepare("UPDATE users SET username = ?, role_id = ? WHERE id = ?");
+            $stmt->bind_param("sii", $username, $role_id, $user['id']);
         }
-    }
 
-    if ($valid) {
-        try {
-            $conn->begin_transaction();
-
-            if (!empty($password)) {
-                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $conn->prepare("UPDATE users SET username = ?, password = ?, role_id = ? WHERE id = ?");
-                $stmt->bind_param("ssii", $username, $hashed_password, $role_id, $user['id']);
-            } else {
-                $stmt = $conn->prepare("UPDATE users SET username = ?, role_id = ? WHERE id = ?");
-                $stmt->bind_param("sii", $username, $role_id, $user['id']);
-            }
-
-            if ($stmt->execute()) {
-                $conn->commit();
-                $msg = "Lietotājs veiksmīgi atjaunināts!";
-                $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
-                $stmt->bind_param("i", $user['id']);
-                $stmt->execute();
-                $user = $stmt->get_result()->fetch_assoc();
-            } else {
-                throw new Exception($stmt->error);
-            }
+        if ($stmt->execute()) {
+            $msg = "Lietotājs veiksmīgi atjaunināts!";
+            $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+            $stmt->bind_param("i", $user['id']);
+            $stmt->execute();
+            $user = $stmt->get_result()->fetch_assoc();
             $stmt->close();
-        } catch (Exception $e) {
-            $conn->rollback();
-            $msg = "Kļūda atjauninot lietotāju: " . $e->getMessage();
+        } else {
+            $msg = "Kļūda atjauninot lietotāju: " . $stmt->error;
+            $stmt->close();
         }
-    } else {
+  } else {
         $msg = implode("<br>", $errors);
     }
 }

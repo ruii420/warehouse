@@ -90,23 +90,12 @@ if ($valid_dates) {
 
 $total_movements = count($report_data);
 $total_quantity = 0;
-$movements_by_shelf = [];
 $movements_by_type = [];
 
 foreach ($report_data as $movement) {
     $total_quantity += $movement['quantity'];
-    
-    if ($movement['from_shelf']) {
-        $movements_by_shelf[$movement['from_shelf']] = ($movements_by_shelf[$movement['from_shelf']] ?? 0) + 1;
-    }
-    if ($movement['to_shelf']) {
-        $movements_by_shelf[$movement['to_shelf']] = ($movements_by_shelf[$movement['to_shelf']] ?? 0) + 1;
-    }
-    
     $movements_by_type[$movement['action_type']] = ($movements_by_type[$movement['action_type']] ?? 0) + 1;
 }
-
-$most_active_shelf = !empty($movements_by_shelf) ? array_search(max($movements_by_shelf), $movements_by_shelf) : '-';
 
 $conn->close();
 ?>
@@ -174,10 +163,6 @@ $conn->close();
                     <div class="stat-card">
                         <h3>Kopējās Kustības</h3>
                         <p class="stat-number"><?= $total_movements ?></p>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Aktīvākais Plaukts</h3>
-                        <p class="stat-number"><?= htmlspecialchars($most_active_shelf) ?></p>
                     </div>
                     <div class="stat-card">
                         <h3>Kopējais Pārvietotais Daudzums</h3>
