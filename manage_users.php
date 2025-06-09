@@ -9,7 +9,6 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['permissions']['can_manage_
 
 $msg = '';
 
-// Define role display names
 $role_display_names = [
     'Admin' => 'Administrators',
     'Warehouse Worker' => 'Noliktavas Darbinieks',

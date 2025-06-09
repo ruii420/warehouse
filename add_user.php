@@ -37,7 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $valid = true;
     $errors = [];
 
-    // Validate username
     if (empty($username)) {
         $valid = false;
         $errors[] = "Lietotājvārds ir obligāts.";
@@ -49,7 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = "Lietotājvārds var saturēt tikai burtus un ciparus.";
     }
 
-    // Check if username exists
     $stmt = $conn->prepare("SELECT id FROM users WHERE username = ?");
     $stmt->bind_param("s", $username);
     $stmt->execute();
