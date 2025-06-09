@@ -156,10 +156,11 @@ body {
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     max-width: 800px;
     margin: 0 auto;
+    margin-bottom: 30px;
 }
 
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
 label {
@@ -340,23 +341,27 @@ button[type="submit"]:hover,
 }
 
 .message {
-    padding: 12px 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
     font-weight: 500;
     animation: fadeOut 0.5s ease 3s forwards;
 }
 
 .message.error {
-    background-color: #fee2e2;
-    color: #ef4444;
-    border: 1px solid #ef4444;
+    background-color: #ffe6e6;
+    border: 1px solid #ff9999;
+    color: #cc0000;
 }
 
 .message.success {
-    background-color: #d1fae5;
-    color: #10b981;
-    border: 1px solid #10b981;
+    background-color: #e6ffe6;
+    border: 1px solid #99ff99;
+    color: #006600;
+}
+
+button[type="submit"] {
+    margin-top: 20px;
 }
 
 @keyframes fadeOut {

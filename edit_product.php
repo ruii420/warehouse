@@ -47,47 +47,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $product_data) {
         $msg = "Kategorija var saturēt tikai burtus, ciparus un pasvītrojumus.";
     } elseif (!preg_match("/^[a-zA-Z0-9_]+$/", $company_id)) {
         $msg = "Uzņēmuma ID var saturēt tikai burtus, ciparus un pasvītrojums.";
+    } elseif (strlen($description) > 500) {
+        $msg = "Apraksts nevar būt garāks par 500 simboliem.";
+    } elseif (!preg_match("/^[a-zA-Z0-9\s\.,\-]+$/u", $description)) {
+        $msg = "Apraksts var saturēt tikai burtus, ciparus, atstarpes, punktus, komatus un domuzīmes.";
     } elseif ($quantity === false || $quantity < 0 || !preg_match("/^[0-9]+$/", $_POST['quantity'])) {
         $msg = "Daudzumam jābūt pozitīvam veselam skaitlim.";
     } elseif ($price === false || $price <= 0 || !preg_match("/^[0-9]+\.?[0-9]*$/", $_POST['price'])) {
         $msg = "Cenai jābūt pozitīvam skaitlim ar minimums 1 punktu.";
     } else {
-        $stmt = $conn->prepare("UPDATE products SET name = ?, description = ?, category = ?, company_id = ?, quantity = ?, price = ? WHERE id = ?");
-        $stmt->bind_param("ssssidi", $name, $description, $category, $company_id, $quantity, $price, $product_id);
-
-        if ($stmt->execute()) {
-            $msg = "Produkts veiksmīgi atjaunināts!";
-            $product_data['name'] = $name;
-            $product_data['description'] = $description;
-            $product_data['category'] = $category;
-            $product_data['company_id'] = $company_id;
-            $product_data['quantity'] = $quantity;
-            $product_data['price'] = $price;
-
-            $user_id = $_SESSION['user_id'];
-            $action_type = 'Rediģēšana';
-            $action_description = "Preces informācija atjaunināta";
-
-            $log_mod_stmt = $conn->prepare("INSERT INTO product_log (product_id, user_id, action_type, action_description) VALUES (?, ?, ?, ?)");
-            $log_mod_stmt->bind_param("iiss", $product_id, $user_id, $action_type, $action_description);
-            $log_mod_stmt->execute();
-            $log_mod_stmt->close();
-
-          
-            if ($quantity != $product_data['quantity']) {
-                $quantity_change = $quantity - $product_data['quantity'];
-                $action_type = 'Daudzuma_maiņa';
-                $action_description = "Preces daudzums mainīts no " . $product_data['quantity'] . " uz " . $quantity;
-                $inventory_log_stmt = $conn->prepare("INSERT INTO inventory_log (product_id, user_id, action_type, quantity_change, new_quantity, action_description) VALUES (?, ?, ?, ?, ?, ?)");
-                $inventory_log_stmt->bind_param("iisiss", $product_id, $user_id, $action_type, $quantity_change, $quantity, $action_description);
-                $inventory_log_stmt->execute();
-                $inventory_log_stmt->close();
-            }
-
+        $action_description = isset($_POST['action_description']) ? trim($_POST['action_description']) : '';
+        
+        if (strlen($action_description) > 200) {
+            $msg = "Darbības apraksts nevar būt garāks par 200 simboliem.";
+        } elseif (!empty($action_description) && !preg_match("/^[a-zA-Z0-9\s\.,\-]+$/u", $action_description)) {
+            $msg = "Darbības apraksts var saturēt tikai burtus, ciparus, atstarpes, punktus, komatus un domuzīmes.";
         } else {
-            $msg = "Kļūda atjauninot produktu: " . $stmt->error;
+            $stmt = $conn->prepare("UPDATE products SET name = ?, description = ?, category = ?, company_id = ?, quantity = ?, price = ? WHERE id = ?");
+            $stmt->bind_param("ssssidi", $name, $description, $category, $company_id, $quantity, $price, $product_id);
+
+            if ($stmt->execute()) {
+                $msg = "Produkts veiksmīgi atjaunināts!";
+                $product_data['name'] = $name;
+                $product_data['description'] = $description;
+                $product_data['category'] = $category;
+                $product_data['company_id'] = $company_id;
+                $product_data['quantity'] = $quantity;
+                $product_data['price'] = $price;
+
+                $user_id = $_SESSION['user_id'];
+                $action_type = 'Rediģēšana';
+                $action_description = "Preces informācija atjaunināta";
+
+                $log_mod_stmt = $conn->prepare("INSERT INTO product_log (product_id, user_id, action_type, action_description) VALUES (?, ?, ?, ?)");
+                $log_mod_stmt->bind_param("iiss", $product_id, $user_id, $action_type, $action_description);
+                $log_mod_stmt->execute();
+                $log_mod_stmt->close();
+
+              
+                if ($quantity != $product_data['quantity']) {
+                    $quantity_change = $quantity - $product_data['quantity'];
+                    $action_type = 'Daudzuma_maiņa';
+                    $action_description = "Preces daudzums mainīts no " . $product_data['quantity'] . " uz " . $quantity;
+                    $inventory_log_stmt = $conn->prepare("INSERT INTO inventory_log (product_id, user_id, action_type, quantity_change, new_quantity, action_description) VALUES (?, ?, ?, ?, ?, ?)");
+                    $inventory_log_stmt->bind_param("iisiss", $product_id, $user_id, $action_type, $quantity_change, $quantity, $action_description);
+                    $inventory_log_stmt->execute();
+                    $inventory_log_stmt->close();
+                }
+
+            } else {
+                $msg = "Kļūda atjauninot produktu: " . $stmt->error;
+            }
+            $stmt->close();
         }
-        $stmt->close();
     }
 }
 
